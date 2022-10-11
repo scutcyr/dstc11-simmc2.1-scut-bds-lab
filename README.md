@@ -1,4 +1,4 @@
-# iFLYTEK DSTC11-Track1-SIMMC2.1 Submission
+# [iFLYTEK DSTC11-Track1-SIMMC2.1 Submission](https://github.com/scutcyr/dstc11-simmc2.1-iflytek)
 
 <p align="center">
     <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202-red.svg"></a>
@@ -16,10 +16,11 @@
 
 
 ## Overview
-The SIMMC challenge aims to lay the foundations for the real-world assistant agents that can handle multimodal inputs, and perform multimodal actions.
+The [SIMMC2.1](https://github.com/facebookresearch/simmc2) challenge aims to lay the foundations for the real-world assistant agents that can handle multimodal inputs, and perform multimodal actions. It has 4 tasks: Ambiguous Candidate Identification, Multimodal Coreference Resolution, Multimodal Dialog State Tracking, Response Generation.
 
 
-## Environment
+
+## Requirements and Installation
 
 
 
@@ -55,6 +56,15 @@ The SIMMC challenge aims to lay the foundations for the real-world assistant age
 }
 ```
 **NOTE**: The [paper][simmc2_arxiv] (EMNLP 2021) above describes in detail the datasets, the collection process, and some of the baselines we provide in this challenge. 
+
+
+## Acknowledge
+* We would like to express our gratitude to the authors of [Hugging Face's Transformers🤗](https://huggingface.co/) and its open source community for the excellent design on pretrained models usage.
+* We would like to express our gratitude to [Meta Research | Facebook AI Research](https://github.com/facebookresearch) for the SIMMC2.1 dataset and the baseline code.
+
+## License
+The project is provided under the [Apache-2.0 License](https://github.com/scutcyr/dstc11-simmc2.1-iflytek/blob/main/LICENSE).
+
 
 <p align="center">
   <img src="./figure/iflytek_logo.png" />
