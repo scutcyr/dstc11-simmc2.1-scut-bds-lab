@@ -8,8 +8,6 @@
     <a href="https://github.com/scutcyr/dstc11-simmc2.1-iflytek/commits"><img src="https://img.shields.io/github/commit-activity/m/scutcyr/dstc11-simmc2.1-iflytek?color=3af"></a>
     <a href="https://github.com/scutcyr/dstc11-simmc2.1-iflytek/issues"><img src="https://img.shields.io/github/issues/scutcyr/dstc11-simmc2.1-iflytek?color=9cc"></a>
     <a href="https://github.com/scutcyr/dstc11-simmc2.1-iflytek/stargazers"><img src="https://img.shields.io/github/stars/scutcyr/dstc11-simmc2.1-iflytek?color=ccf"></a>
-    <a href="=https://pypi.org/project/paddlespeech/"><img src="https://img.shields.io/pypi/dm/PaddleSpeech"></a>
-    <a href="=https://pypi.org/project/paddlespeech/"><img src="https://static.pepy.tech/badge/paddlespeech"></a>
 </p>
 
 ## Recent Update
