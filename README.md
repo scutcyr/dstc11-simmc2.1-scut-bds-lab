@@ -233,7 +233,12 @@ We provide the code [eval_model.py](./eval_model.py) for evaluating the model.
 
 ## Results
 
+### devtest result
 
+| Model | Subtask-1 Amb. Candi. F1 | Subtask-2 MM Coref F1 | Subtask-3 MM DST Slot F1 | Subtask-3 MM DST Intent F1 | Subtask-4 Response Gen. BLEU-4 |
+|:----:|:----:|:----:|:----:|:----:|:----:|
+| mt-bart | 0.65744 | 0.76564 | 0.91889 | 0.97537 | 0.34496 |
+| mt-bart-sys |  |  |  |  | 0.39064 |
 
 
 ## References
