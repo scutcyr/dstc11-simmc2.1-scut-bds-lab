@@ -192,6 +192,179 @@ def evaluate_from_flat_list(d_true, d_pred):
     }
 
 
+
+def evaluate_from_flat_list_mentioned_object(d_true, d_pred, mentioned_objects):
+    """
+    <list>d_true and <list>d_pred are in the following format:
+    (Each element represents a single turn, with (multiple) frames)
+    [
+        [
+            {
+                'act': <str>,
+                'slots': [
+                    [
+                        SLOT_NAME, SLOT_VALUE
+                    ],
+                    ...
+                ],
+                'request_slots': [ SLOT_NAME, ... ],
+                'objects': [ <int> ],
+                'disambiguation_candidates': [ <int> ]
+            },
+            [End of a frame]
+            ...
+        ],
+        [End of a turn]
+        ...
+    ]
+
+    mentioned_objects:
+    [
+        {
+            "dialog_id": 10507,
+            "turn_id": 0,
+            "multimodal_context": []
+        },
+        {
+            "dialog_id": 10507,
+            "turn_id": 1,
+            "multimodal_context": [
+                40,
+                12,
+                37
+            ]
+        },
+        ...
+    ]
+    """
+    c = initialize_count_dict_mentioned_object()
+
+    # Count # corrects & # wrongs
+    for i in range(len(d_true)):
+        true_turn = d_true[i]
+        pred_turn = d_pred[i]
+        mentioned_object = mentioned_objects[i]["multimodal_context"]
+        turn_evaluation = evaluate_turn_mentioned_object(true_turn, pred_turn, mentioned_object)
+        #turn_evaluation = evaluate_turn(true_turn, pred_turn)
+
+        c = add_dicts(c, turn_evaluation)
+
+    # Calculate metrics
+    joint_accuracy = c["n_correct_beliefs"] / c["n_frames"]
+
+    act_rec, act_prec, act_f1 = rec_prec_f1(
+        n_correct=c["n_correct_acts"], n_true=c["n_true_acts"], n_pred=c["n_pred_acts"]
+    )
+
+    slot_rec, slot_prec, slot_f1 = rec_prec_f1(
+        n_correct=c["n_correct_slots"],
+        n_true=c["n_true_slots"],
+        n_pred=c["n_pred_slots"],
+    )
+
+    request_slot_rec, request_slot_prec, request_slot_f1 = rec_prec_f1(
+        n_correct=c["n_correct_request_slots"],
+        n_true=c["n_true_request_slots"],
+        n_pred=c["n_pred_request_slots"],
+    )
+
+    object_rec, object_prec, object_f1 = rec_prec_f1(
+        n_correct=c["n_correct_objects"],
+        n_true=c["n_true_objects"],
+        n_pred=c["n_pred_objects"],
+    )
+
+    disamb_candidate_rec, disamb_candidate_prec, disamb_candidate_f1 = rec_prec_f1(
+        n_correct=c["n_correct_disamb_candidates"],
+        n_true=c["n_true_disamb_candidates"],
+        n_pred=c["n_pred_disamb_candidates"],
+    )    
+
+    # calculate in mention_object
+    object_rec_mentioned_object, object_prec_mentioned_object, object_f1_mentioned_object = rec_prec_f1(
+        n_correct=c["n_correct_objects_mentioned_object"],
+        n_true=c["n_true_objects_mentioned_object"],
+        n_pred=c["n_pred_objects_mentioned_object"],
+    )
+
+    disamb_candidate_rec_mentioned_object, disamb_candidate_prec_mentioned_object, disamb_candidate_f1_mentioned_object = rec_prec_f1(
+        n_correct=c["n_correct_disamb_candidates_mentioned_object"],
+        n_true=c["n_true_disamb_candidates_mentioned_object"],
+        n_pred=c["n_pred_disamb_candidates_mentioned_object"],
+    ) 
+
+    # calculate not in mention_object
+    object_rec_not_mentioned_object, object_prec_not_mentioned_object, object_f1_not_mentioned_object = rec_prec_f1(
+        n_correct=c["n_correct_objects_not_mentioned_object"],
+        n_true=c["n_true_objects_not_mentioned_object"],
+        n_pred=c["n_pred_objects_not_mentioned_object"],
+    )
+
+    disamb_candidate_rec_not_mentioned_object, disamb_candidate_prec_not_mentioned_object, disamb_candidate_f1_not_mentioned_object = rec_prec_f1(
+        n_correct=c["n_correct_disamb_candidates_not_mentioned_object"],
+        n_true=c["n_true_disamb_candidates_not_mentioned_object"],
+        n_pred=c["n_pred_disamb_candidates_not_mentioned_object"],
+    )
+
+    # Calculate std err
+    act_f1_stderr = d_f1(c["n_true_acts"], c["n_pred_acts"], c["n_correct_acts"])
+    slot_f1_stderr = d_f1(c["n_true_slots"], c["n_pred_slots"], c["n_correct_slots"])
+    request_slot_f1_stderr = d_f1(
+        c["n_true_request_slots"],
+        c["n_pred_request_slots"],
+        c["n_correct_request_slots"],
+    )
+    object_f1_stderr = d_f1(
+        c["n_true_objects"],
+        c["n_pred_objects"],
+        c["n_correct_objects"]
+    )
+    disamb_candidate_f1_stderr = d_f1(
+        c["n_true_disamb_candidates"],
+        c["n_pred_disamb_candidates"],
+        c["n_correct_disamb_candidates"]
+    )    
+
+    return {
+        "joint_accuracy": joint_accuracy,
+        "act_rec": act_rec,
+        "act_prec": act_prec,
+        "act_f1": act_f1,
+        "act_f1_stderr": act_f1_stderr,
+        "slot_rec": slot_rec,
+        "slot_prec": slot_prec,
+        "slot_f1": slot_f1,
+        "slot_f1_stderr": slot_f1_stderr,
+        "request_slot_rec": request_slot_rec,
+        "request_slot_prec": request_slot_prec,
+        "request_slot_f1": request_slot_f1,
+        "request_slot_f1_stderr": request_slot_f1_stderr,
+        "object_rec": object_rec,
+        "object_prec": object_prec,
+        "object_f1": object_f1,
+        "object_rec_mentioned_object": object_rec_mentioned_object,
+        "object_prec_mentioned_object": object_prec_mentioned_object,
+        "object_f1_mentioned_object": object_f1_mentioned_object,
+        "object_rec_not_mentioned_object": object_rec_not_mentioned_object,
+        "object_prec_not_mentioned_object": object_prec_not_mentioned_object,
+        "object_f1_not_mentioned_object": object_f1_not_mentioned_object,
+        "object_f1_stderr": object_f1_stderr,
+        "disamb_candidate_rec": disamb_candidate_rec,
+        "disamb_candidate_prec": disamb_candidate_prec,
+        "disamb_candidate_f1": disamb_candidate_f1,
+        "disamb_candidate_rec_mentioned_object": disamb_candidate_rec_mentioned_object,
+        "disamb_candidate_prec_mentioned_object": disamb_candidate_prec_mentioned_object,
+        "disamb_candidate_f1_mentioned_object": disamb_candidate_f1_mentioned_object,
+        "disamb_candidate_rec_not_mentioned_object": disamb_candidate_rec_not_mentioned_object,
+        "disamb_candidate_prec_not_mentioned_object": disamb_candidate_prec_not_mentioned_object,
+        "disamb_candidate_f1_not_mentioned_object": disamb_candidate_f1_not_mentioned_object,
+        "disamb_candidate_f1_stderr": disamb_candidate_f1_stderr,        
+    }
+
+
+
+
+
 def evaluate_turn(true_turn, pred_turn):
 
     count_dict = initialize_count_dict()
@@ -210,6 +383,253 @@ def evaluate_turn(true_turn, pred_turn):
         )
 
     return count_dict
+
+
+def evaluate_turn_mentioned_object(true_turn, pred_turn, mentioned_object):
+    '''
+    2022/10/25 新增
+    mentioned_object: List[int]
+
+    '''
+
+    count_dict = initialize_count_dict_mentioned_object()
+
+    # Must preserve order in which frames appear.
+    for frame_idx in range(len(true_turn)):
+        # For each frame
+        true_frame = true_turn[frame_idx]
+        if frame_idx >= len(pred_turn):
+            pred_frame = {}
+        else:
+            pred_frame = pred_turn[frame_idx]
+
+        count_dict = add_dicts(
+            count_dict, evaluate_frame_mentioned_object(true_frame, pred_frame, mentioned_object, strict=False)
+        )
+
+    return count_dict
+
+
+def evaluate_frame_mentioned_object(true_frame, pred_frame, mentioned_object, strict=True):
+    """
+    2022/10/25 新增
+    If strict=True,
+        For each dialog_act (frame), set(slot values) must match.
+        If dialog_act is incorrect, its set(slot values) is considered wrong.
+    """
+    count_dict = initialize_count_dict_mentioned_object()
+    count_dict["n_frames"] += 1
+
+    # Compare Dialog Actss
+    true_act = true_frame["act"] if "act" in true_frame else None
+    pred_act = pred_frame["act"] if "act" in pred_frame else None
+    b_correct_act = true_act == pred_act
+    count_dict["n_correct_acts"] += b_correct_act
+    count_dict["n_true_acts"] += "act" in true_frame
+    count_dict["n_pred_acts"] += "act" in pred_frame
+
+    # (1) Compare Slots
+    #true_frame_slot_values = {f"{k}={v}" for k, v in true_frame.get("slots", [])}
+    #pred_frame_slot_values = {f"{k}={v}" for k, v in pred_frame.get("slots", [])}
+
+    true_frame_slot_values = set()
+    pred_frame_slot_values = set()
+
+    for k, v in true_frame.get("slots", []):
+        if k in set(['availableSizes']):
+            # For availableSizes, we expect that the type is <list>.
+            # Otherwise, try converting it to a <list>.
+            if type(v) == str:
+                try:
+                    v = list(eval(v))
+                except:
+                    v = [v]
+
+            elif type(v) == tuple or type(v) == set:
+                v = list(v)
+
+            # Sort the elements to get consistent ordering.
+            # For slots with a list of elements, all elements must be captured.
+            if type(v) == list:
+                v.sort()
+
+        true_frame_slot_values.add(f"{k}={v}")
+
+    for k, v in pred_frame.get("slots", []):
+        if k in set(['availableSizes']):
+            if type(v) == str:
+                try:
+                    v = list(eval(v))
+                except:
+                    v = [v]
+
+            elif type(v) == tuple or type(v) == set:
+                v = list(v)
+            if type(v) == list:
+                v.sort()
+
+        pred_frame_slot_values.add(f"{k}={v}")
+
+    count_dict["n_true_slots"] += len(true_frame_slot_values)
+    count_dict["n_pred_slots"] += len(pred_frame_slot_values)
+
+    if strict and not b_correct_act:
+        pass
+    else:
+        count_dict["n_correct_slots"] += len(
+            true_frame_slot_values.intersection(pred_frame_slot_values)
+        )
+
+    # Debug only
+    # if len(true_frame_slot_values.intersection(pred_frame_slot_values)) != len(pred_frame_slot_values):
+    # print(true_frame_slot_values)
+    # print(pred_frame_slot_values)
+    # print(len(true_frame_slot_values.intersection(pred_frame_slot_values)) == len(pred_frame_slot_values))
+    # print('--')
+
+    # (2) Compare Request slots
+    true_frame_request_slot_values = {rs for rs in true_frame.get("request_slots", [])}
+    pred_frame_request_slot_values = {rs for rs in pred_frame.get("request_slots", [])}
+    # print(true_frame_request_slot_values)
+
+    count_dict["n_true_request_slots"] += len(true_frame_request_slot_values)
+    count_dict["n_pred_request_slots"] += len(pred_frame_request_slot_values)
+
+    if strict and not b_correct_act:
+        pass
+    else:
+        count_dict["n_correct_request_slots"] += len(
+            true_frame_request_slot_values.intersection(pred_frame_request_slot_values)
+        )
+
+    # (3) Compare Objects
+    true_frame_object_values = {
+        object_id for object_id in true_frame.get("objects", [])
+    }
+    pred_frame_object_values = {
+        object_id for object_id in pred_frame.get("objects", [])
+    }
+    # print(true_frame_object_values)
+
+    count_dict["n_true_objects"] += len(true_frame_object_values)
+    count_dict["n_pred_objects"] += len(pred_frame_object_values)
+
+    if strict and not b_correct_act:
+        pass
+    else:
+        count_dict["n_correct_objects"] += len(
+            true_frame_object_values.intersection(pred_frame_object_values)
+        )
+
+    ## 3.1 Compare Objects in mentioned_object
+    # mentioned_object
+    true_frame_object_values_mentioned_object = {
+        object_id for object_id in true_frame.get("objects", []) if object_id in mentioned_object
+    }
+    pred_frame_object_values_mentioned_object = {
+        object_id for object_id in pred_frame.get("objects", []) if object_id in mentioned_object
+    }
+    # print(true_frame_object_values)
+
+    count_dict["n_true_objects_mentioned_object"] += len(true_frame_object_values_mentioned_object)
+    count_dict["n_pred_objects_mentioned_object"] += len(pred_frame_object_values_mentioned_object)
+
+    if strict and not b_correct_act:
+        pass
+    else:
+        count_dict["n_correct_objects_mentioned_object"] += len(
+            true_frame_object_values_mentioned_object.intersection(pred_frame_object_values_mentioned_object)
+        )
+
+    ## 3.1 Compare Objects not in mentioned_object
+    # mentioned_object
+    true_frame_object_values_not_mentioned_object = {
+        object_id for object_id in true_frame.get("objects", []) if object_id not in mentioned_object
+    }
+    pred_frame_object_values_not_mentioned_object = {
+        object_id for object_id in pred_frame.get("objects", []) if object_id not in mentioned_object
+    }
+    # print(true_frame_object_values)
+
+    count_dict["n_true_objects_not_mentioned_object"] += len(true_frame_object_values_not_mentioned_object)
+    count_dict["n_pred_objects_not_mentioned_object"] += len(pred_frame_object_values_not_mentioned_object)
+
+    if strict and not b_correct_act:
+        pass
+    else:
+        count_dict["n_correct_objects_not_mentioned_object"] += len(
+            true_frame_object_values_mentioned_object.intersection(pred_frame_object_values_not_mentioned_object)
+        )
+
+
+    # (4) Compare Disambiguation Objects
+    true_frame_disamb_candidate_values = {
+        disamb_candidate_id for disamb_candidate_id in true_frame.get("disambiguation_candidates", [])
+    }
+    pred_frame_disamb_candidate_values = {
+        disamb_candidate_id for disamb_candidate_id in pred_frame.get("disambiguation_candidates", [])
+    }
+    # print(true_frame_disamb_candidate_values)
+
+    count_dict["n_true_disamb_candidates"] += len(true_frame_disamb_candidate_values)
+    count_dict["n_pred_disamb_candidates"] += len(pred_frame_disamb_candidate_values)
+
+    if strict and not b_correct_act:
+        pass
+    else:
+        count_dict["n_correct_disamb_candidates"] += len(
+            true_frame_disamb_candidate_values.intersection(pred_frame_disamb_candidate_values)
+        )
+
+    # 4.1 Compare Disambiguation Objects in mentioned_object
+    true_frame_disamb_candidate_values_mentioned_object = {
+        disamb_candidate_id for disamb_candidate_id in true_frame.get("disambiguation_candidates", []) if disamb_candidate_id in mentioned_object
+    }
+    pred_frame_disamb_candidate_values_mentioned_object = {
+        disamb_candidate_id for disamb_candidate_id in pred_frame.get("disambiguation_candidates", []) if disamb_candidate_id in mentioned_object
+    }
+    # print(true_frame_disamb_candidate_values)
+
+    count_dict["n_true_disamb_candidates_mentioned_object"] += len(true_frame_disamb_candidate_values_mentioned_object)
+    count_dict["n_pred_disamb_candidates_mentioned_object"] += len(pred_frame_disamb_candidate_values_mentioned_object)
+
+    if strict and not b_correct_act:
+        pass
+    else:
+        count_dict["n_correct_disamb_candidates_mentioned_object"] += len(
+            true_frame_disamb_candidate_values_mentioned_object.intersection(pred_frame_disamb_candidate_values_mentioned_object)
+        )
+
+
+    # 4.2 Compare Disambiguation Objects not in mentioned_object
+    true_frame_disamb_candidate_values_not_mentioned_object = {
+        disamb_candidate_id for disamb_candidate_id in true_frame.get("disambiguation_candidates", []) if disamb_candidate_id not in mentioned_object
+    }
+    pred_frame_disamb_candidate_values_not_mentioned_object = {
+        disamb_candidate_id for disamb_candidate_id in pred_frame.get("disambiguation_candidates", []) if disamb_candidate_id not in mentioned_object
+    }
+    # print(true_frame_disamb_candidate_values)
+
+    count_dict["n_true_disamb_candidates_not_mentioned_object"] += len(true_frame_disamb_candidate_values_not_mentioned_object)
+    count_dict["n_pred_disamb_candidates_not_mentioned_object"] += len(pred_frame_disamb_candidate_values_not_mentioned_object)
+
+    if strict and not b_correct_act:
+        pass
+    else:
+        count_dict["n_correct_disamb_candidates_not_mentioned_object"] += len(
+            true_frame_disamb_candidate_values_not_mentioned_object.intersection(pred_frame_disamb_candidate_values_not_mentioned_object)
+        )
+
+    # (5) Joint
+    count_dict["n_correct_beliefs"] += (
+        b_correct_act
+        and true_frame_slot_values == pred_frame_slot_values
+        and true_frame_request_slot_values == pred_frame_request_slot_values
+        and true_frame_object_values == pred_frame_object_values
+    )
+
+    return count_dict
+
 
 
 def evaluate_frame(true_frame, pred_frame, strict=True):
@@ -410,6 +830,45 @@ def initialize_count_dict():
         "n_correct_beliefs": 0.0,
     }
     return copy.deepcopy(c)
+
+
+
+def initialize_count_dict_mentioned_object():
+    c = {
+        "n_frames": 0.0,
+        "n_true_acts": 0.0,
+        "n_pred_acts": 0.0,
+        "n_correct_acts": 0.0,
+        "n_true_slots": 0.0,
+        "n_pred_slots": 0.0,
+        "n_correct_slots": 0.0,
+        "n_true_request_slots": 0.0,
+        "n_pred_request_slots": 0.0,
+        "n_correct_request_slots": 0.0,
+        "n_true_objects": 0.0,
+        "n_pred_objects": 0.0,
+        "n_correct_objects": 0.0,
+        "n_true_disamb_candidates": 0.0,
+        "n_pred_disamb_candidates": 0.0,
+        "n_correct_disamb_candidates": 0.0,     
+        "n_true_objects_mentioned_object": 0.0,
+        "n_pred_objects_mentioned_object": 0.0,
+        "n_correct_objects_mentioned_object": 0.0,
+        "n_true_disamb_candidates_mentioned_object": 0.0,
+        "n_pred_disamb_candidates_mentioned_object": 0.0,
+        "n_correct_disamb_candidates_mentioned_object": 0.0,   
+        "n_true_objects_not_mentioned_object": 0.0,
+        "n_pred_objects_not_mentioned_object": 0.0,
+        "n_correct_objects_not_mentioned_object": 0.0,
+        "n_true_disamb_candidates_not_mentioned_object": 0.0,
+        "n_pred_disamb_candidates_not_mentioned_object": 0.0,
+        "n_correct_disamb_candidates_not_mentioned_object": 0.0,      
+        "n_correct_beliefs": 0.0,
+    }
+    return copy.deepcopy(c)
+
+
+
 
 
 if __name__ == "__main__":
