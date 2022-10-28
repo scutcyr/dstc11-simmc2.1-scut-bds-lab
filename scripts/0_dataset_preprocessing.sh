@@ -41,10 +41,10 @@ fi
 
 # 指定原始数据集的绝对路径
 INPUT_DIR=/yrfs1/intern/yrchen5/dstc11_simmc2.1_iflytek/data
-# 指定预处理后的数据的存储路径
-OUTPUT_DIR=$PWD/data_convert
 # 指定当前的工作目录，需要保证convert_simmc21_sysana_for_task4.py存放在工作目录下面
 WORK_DIR=/yrfs1/intern/yrchen5/dstc11_simmc2.1_iflytek/dstc11-simmc2.1-iflytek
+# 指定预处理后的数据的存储路径
+OUTPUT_DIR=$WORK_DIR/data_convert
 
 mkdir -p $OUTPUT_DIR
 
@@ -109,7 +109,123 @@ python convert.py \
   --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_devtest.json \
   --output_inference_disambiguation=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_inference_disambiguation.json \
 
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_dev.json \
+  --output_inference_disambiguation=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_inference_disambiguation.json \
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_devtest.json \
+  --output_multimodal_context_json=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_multimodal_context.json \
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_dev.json \
+  --output_multimodal_context_json=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_multimodal_context.json \
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_devtest.json \
+  --output_inference_json=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_inference_only_final_turn.json \
+  --predict_only_final_turn_system_transcript
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_devtest.json \
+  --output_inference_json=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_inference_only_final_turn.json \
+  --predict_only_final_turn_system_transcript
+
+
 cd -
 
 wait
+
+cd $WORK_DIR
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_devtest.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_predict_ctxlen2.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_predict_ctxlen2_final_turn.txt
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_devtest.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_predict_ctxlen4.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_predict_ctxlen4_final_turn.txt
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_devtest.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_predict_ctxlen6.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_predict_ctxlen6_final_turn.txt
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_devtest.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_predict_ctxlen8.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_predict_ctxlen8_final_turn.txt
+
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_dev.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_predict_ctxlen2.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_predict_ctxlen2_final_turn.txt
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_dev.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_predict_ctxlen4.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_predict_ctxlen4_final_turn.txt
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_dev.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_predict_ctxlen6.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_predict_ctxlen6_final_turn.txt
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_dev.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_predict_ctxlen8.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_predict_ctxlen8_final_turn.txt
+
+
+# 生成target finalturn的line-by-line文件
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_devtest.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_target_ctxlen2.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_target_ctxlen2_final_turn.txt
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_devtest.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_target_ctxlen4.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_target_ctxlen4_final_turn.txt
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_devtest.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_target_ctxlen6.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_target_ctxlen6_final_turn.txt
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_devtest.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_target_ctxlen8.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_target_ctxlen8_final_turn.txt
+
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_dev.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_target_ctxlen2.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_target_ctxlen2_final_turn.txt
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_dev.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_target_ctxlen4.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_target_ctxlen4_final_turn.txt
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_dev.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_target_ctxlen6.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_target_ctxlen6_final_turn.txt
+
+python convert.py \
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_dev.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_target_ctxlen8.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_target_ctxlen8_final_turn.txt
+
+
+
+
+
+
+
 echo "end"

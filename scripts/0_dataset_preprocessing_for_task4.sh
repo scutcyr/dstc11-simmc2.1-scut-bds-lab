@@ -41,10 +41,10 @@ fi
 
 # 指定原始数据集的绝对路径
 INPUT_DIR=/yrfs1/intern/yrchen5/dstc11_simmc2.1_iflytek/data
-# 指定预处理后的数据的存储路径
-OUTPUT_DIR=$PWD/data_convert
 # 指定当前的工作目录，需要保证convert_simmc21_sysana_for_task4.py存放在工作目录下面
 WORK_DIR=/yrfs1/intern/yrchen5/dstc11_simmc2.1_iflytek/dstc11-simmc2.1-iflytek
+# 指定预处理后的数据的存储路径
+OUTPUT_DIR=$WORK_DIR/data_convert
 
 mkdir -p $OUTPUT_DIR
 

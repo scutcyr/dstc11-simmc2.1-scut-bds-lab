@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-# File: 0_dataset_preprocessing_predict_with_sys_state.sh
+# File: 0_dataset_teststd_preprocessing_predict_with_sys_state.sh
 # Description: Preprocessing scripts for dataset SIMMC2.1
 # Repository: https://github.com/scutcyr/dstc11-simmc2.1-iflytek
 # Mail: [yrchen5@iflytek.com](mailto:yrchen5@iflytek.com) or [eeyirongchen@mail.scut.edu.cn](mailto:eeyirongchen@mail.scut.edu.cn)
@@ -23,7 +23,7 @@
 # Specify the path of the .bashrc file or remove `source /home/intern/yrchen5/.bashrc_cuda11` and `source /home/intern/yrchen5/.bashrc`;
 # Specify the conda python environment, e.g. `conda activate py38cu113` or `conda activate py38`;
 # Change the INPUT_DIR and WORK_DIR to the actual path you specified, and then run
-# $ ./0_dataset_preprocessing_predict_with_sys_state.sh
+# $ ./0_dataset_teststd_preprocessing_predict_with_sys_state.sh
 
 
 # 根据CUDA版本source不同的.bashrc，并且激活不同的conda环境
@@ -50,14 +50,14 @@ mkdir -p $OUTPUT_DIR
 
 function make_data() {
     context_length=$1
-    for file in train dev devtest; do
+    for file in teststd_public; do
         python convert.py \
             --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_$file.json \
             --output_path_predict=$OUTPUT_DIR/simmc2.1_dials_dstc11_${file}_predict_with_sys_state_ctxlen${context_length}.txt \
             --output_path_target=$OUTPUT_DIR/simmc2.1_dials_dstc11_${file}_target_with_sys_state_ctxlen${context_length}.txt \
             --object_special_token_item2id=$INPUT_DIR/item2id.json \
-            --scene_json_folder=$INPUT_DIR/simmc2_scene_jsons_dstc10_public \
-            --image_folder=$INPUT_DIR/simmc2_scene_images_dstc10_public \
+            --scene_json_folder=$INPUT_DIR/simmc2_scene_jsons_dstc10_teststd \
+            --image_folder=$INPUT_DIR/simmc2_scene_images_dstc10_teststd \
             --len_context=$context_length \
             --with_target=0 \
             --use_system_transcript_annotated \
@@ -73,49 +73,26 @@ make_data 8 &
 cd -
 
 wait
-
-
 cd $WORK_DIR
 python convert.py \
-  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_devtest.json \
-  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_predict_with_sys_state_ctxlen2.txt \
-  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_predict_with_sys_state_ctxlen2_final_turn.txt
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_teststd_public.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_teststd_public_predict_with_sys_state_ctxlen2.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_teststd_public_predict_with_sys_state_ctxlen2_final_turn.txt
 
 python convert.py \
-  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_devtest.json \
-  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_predict_with_sys_state_ctxlen4.txt \
-  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_predict_with_sys_state_ctxlen4_final_turn.txt
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_teststd_public.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_teststd_public_predict_with_sys_state_ctxlen4.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_teststd_public_predict_with_sys_state_ctxlen4_final_turn.txt
 
 python convert.py \
-  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_devtest.json \
-  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_predict_with_sys_state_ctxlen6.txt \
-  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_predict_with_sys_state_ctxlen6_final_turn.txt
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_teststd_public.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_teststd_public_predict_with_sys_state_ctxlen6.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_teststd_public_predict_with_sys_state_ctxlen6_final_turn.txt
 
 python convert.py \
-  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_devtest.json \
-  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_predict_with_sys_state_ctxlen8.txt \
-  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_devtest_predict_with_sys_state_ctxlen8_final_turn.txt
-
-
-python convert.py \
-  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_dev.json \
-  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_predict_with_sys_state_ctxlen2.txt \
-  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_predict_with_sys_state_ctxlen2_final_turn.txt
-
-python convert.py \
-  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_dev.json \
-  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_predict_with_sys_state_ctxlen4.txt \
-  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_predict_with_sys_state_ctxlen4_final_turn.txt
-
-python convert.py \
-  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_dev.json \
-  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_predict_with_sys_state_ctxlen6.txt \
-  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_predict_with_sys_state_ctxlen6_final_turn.txt
-
-python convert.py \
-  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_dev.json \
-  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_predict_with_sys_state_ctxlen8.txt \
-  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_dev_predict_with_sys_state_ctxlen8_final_turn.txt
+  --input_path_json=$INPUT_DIR/simmc2.1_dials_dstc11_teststd_public.json \
+  --input_path_all_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_teststd_public_predict_with_sys_state_ctxlen8.txt \
+  --output_path_final_turn_predict_lines=$OUTPUT_DIR/simmc2.1_dials_dstc11_teststd_public_predict_with_sys_state_ctxlen8_final_turn.txt
 
 
 echo "end"
