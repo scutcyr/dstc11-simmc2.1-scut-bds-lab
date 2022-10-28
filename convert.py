@@ -61,7 +61,10 @@ python convert.py \
 
 """
 import os
+import re
 import json
+import copy
+import glob
 import argparse
 import collections
 
@@ -80,6 +83,8 @@ from utils.metadata import (
 )
 
 from utils.image import get_image_name
+
+from evaluation_tools.convert import parse_flattened_results_from_file
 
 # DSTC style dataset fieldnames
 FIELDNAME_DIALOG = "dialogue"
@@ -318,9 +323,21 @@ def format_dialog(dialog,
         if use_system_transcript_annotated:
             ## 处理生成task4所需要的系统信息，这是可以用的
             sys_state = turn[FIELDNAME_SYSTEM_STATE]
-            sys_act = sys_state["act"]
-            sys_slot_values = sys_state["act_attributes"]["slot_values"]
-            sys_request_slots = sys_state["act_attributes"]["request_slots"]
+            if "act" in sys_state:
+                sys_act = sys_state["act"]
+            else:
+                sys_act = ""
+            
+            if "slot_values" in sys_state["act_attributes"]:
+                sys_slot_values = sys_state["act_attributes"]["slot_values"]
+            else:
+                sys_slot_values = {}
+
+            if "request_slots" in sys_state["act_attributes"]:
+                sys_request_slots = sys_state["act_attributes"]["request_slots"]
+            else:
+                sys_request_slots = {}
+
             # sys_objects = sys_state["act_attributes"]["objects"]
             sys_request_slots_str = ", ".join(sys_request_slots)
 
@@ -473,7 +490,8 @@ def convert_json_to_flattened(
     insert_bbox_coords=True,
     revert=False,
     with_target=True,
-    use_system_transcript_annotated=False
+    use_system_transcript_annotated=False,
+    predict_only_final_turn_system_transcript=False
 ):
     """
     Input: JSON representation of the dialogs
@@ -502,6 +520,22 @@ def convert_json_to_flattened(
                          use_disambiguation_candidates=True,
                          use_system_transcript_annotated=use_system_transcript_annotated)
     predicts, targets = zip(*chain.from_iterable(map(_formatter, data)))
+
+    if predict_only_final_turn_system_transcript:
+        new_predicts = []
+        j = 0
+        for i in len(data):
+            j = j + len(data[i][FIELDNAME_DIALOG])
+            new_predicts.append(predicts[j-1])
+
+        print("-----------------------End Converting...------------------------")
+        with open(output_path_predict, "w") as f_predict:
+            f_predict.write("\n".join(new_predicts))
+
+        return True
+
+
+
     print("-----------------------End Converting...------------------------")
     # Output into text files
     with open(output_path_predict, "w") as f_predict:
@@ -577,6 +611,167 @@ def format_dialogue_scene_name(dialogue_data):
     return lines
 
 
+def format_dialogue_subtask4_inference(dialogue_data, predict_only_final_turn_system_transcript=False):
+    # dialogue_data: [{}, {}, {}, ...]
+    lines = []
+    for dialog in dialogue_data:
+        if predict_only_final_turn_system_transcript:
+            lines.append(
+                    {
+                    "dialog_id": dialog["dialogue_idx"],
+                    "turn_id": dialog[FIELDNAME_DIALOG][-1]["turn_idx"]
+                    }
+                )
+
+        else:
+            for turn_idx, turn in enumerate(dialog[FIELDNAME_DIALOG]):
+                lines.append(
+                        {
+                        "dialog_id": dialog["dialogue_idx"],
+                        "turn_id": turn["turn_idx"]
+                        }
+                    )
+    return lines
+
+
+def format_inference_disambiguation(dialogue_data):
+    # 适用于SIMMC2.1、SIMMC2.0
+    # dialogue_data: [{}, {}, {}, ...]
+    lines = []
+    for dialog in dialogue_data:
+        for turn_idx, turn in enumerate(dialog[FIELDNAME_DIALOG]):
+            if "disambiguation_label" in turn["transcript_annotated"]:
+                # SIMMC2.1
+                lines.append(
+                    {
+                    "dialog_id": dialog["dialogue_idx"],
+                    "turn_id": turn["turn_idx"],
+                    "disambiguation_label": turn["transcript_annotated"]["disambiguation_label"]
+                    }
+                )
+            elif "disambiguation_label" in turn:
+                # SIMMC2.0
+                lines.append(
+                    {
+                    "dialog_id": dialog["dialogue_idx"],
+                    "turn_id": turn["turn_idx"],
+                    "disambiguation_label": turn["disambiguation_label"]
+                    }
+                )
+            else:
+                lines.append(
+                    {
+                    "dialog_id": dialog["dialogue_idx"],
+                    "turn_id": turn["turn_idx"],
+                    "disambiguation_label": -100
+                    }
+                )
+    return lines
+
+
+
+def format_multimodal_context(dialogue_data):
+    # 适用于SIMMC2.1、SIMMC2.0
+    # dialogue_data: [{}, {}, {}, ...]
+    lines = []
+    for dialog in dialogue_data:
+        multimodal_context = []
+        for turn_idx, turn in enumerate(dialog[FIELDNAME_DIALOG]):
+            lines.append(
+                    {
+                    "dialog_id": dialog["dialogue_idx"],
+                    "turn_id": turn["turn_idx"],
+                    "multimodal_context": copy.deepcopy(list(set(multimodal_context)))
+                    }
+                )
+
+            multimodal_context.extend(turn["system_transcript_annotated"]["act_attributes"]["objects"])
+
+    return lines
+
+
+
+
+def extract_final_turn_predict_from_all_turn_predict(dialogue_data, predict_lines):
+    final_turn_predict_lines = []
+    line_id = 0
+    for dialog in dialogue_data:
+        dialog_len = len(dialog[FIELDNAME_DIALOG])
+        line_id += dialog_len
+        final_turn_predict_lines.append(predict_lines[line_id-1])
+    return final_turn_predict_lines
+
+
+def convert_taowang_result_to_submit_txt_file(input_file, output_file):
+    '''
+    input_file is a line-by-line file, split the subtask result with tab (	), 
+    with format:
+        generation result \t coref result \t disamb result
+    looks like:
+        REQUEST:COMPARE [  ] ( price, customerReview ) <EOB> The one in the cubicle is $179.99 with a 3.8 rating and the one on the rack is $64.99 with a 3.5 stars rating. <EOS>	["<23>", "<16>"]	[]
+        ...
+
+    output_file is also a line-by-line file, looks like:
+        => Belief State : REQUEST:COMPARE [  ] ( price, customerReview ) < 23, 16 > |  | <EOB> The one in the cubicle is $179.99 with a 3.8 rating and the one on the rack is $64.99 with a 3.5 stars rating. <EOS>
+        
+
+    '''
+
+    belief_state = "=> Belief State : "
+    object_regex = re.compile(r"([A-Za-z0-9]+)")
+    disamb_candidate_regex = re.compile(r"([A-Za-z0-9]+)")
+
+    lines = []
+    with open(input_file, encoding="utf-8") as f:
+        for line in f.read().splitlines():
+            if (len(line) > 0 and not line.isspace()):
+                lines.append(line)
+
+    split_lines = [line.split("\t") for line in lines]
+
+    format_lines = []
+    for line_list in split_lines:
+        text = line_list[0]
+        pos_start, pos_end = [(m.start(0), m.end(0)) for m in re.finditer(r"\) *<EOB>", text)][0]
+        # 格式化任务2的结果为 "< int, int, ... >"
+        coref_str = line_list[1]
+        coref_object_list = []
+        for object_id in object_regex.finditer(coref_str):
+            str_object_id = object_id.group(1).strip()
+            int_object_id = int(str_object_id)
+            coref_object_list.append(int_object_id)
+
+        coref_object_list = sorted(coref_object_list)
+        coref_str = str(coref_object_list).replace('[', '< ').replace(']',' >') if coref_object_list else '<  >'
+        # 格式化任务1的结果为 "| int, int, ... |"
+        disam_str = line_list[2]
+        disam_object_list = []
+        for object_id in object_regex.finditer(disam_str):
+            str_object_id = object_id.group(1).strip()
+            int_object_id = int(str_object_id)
+            disam_object_list.append(int_object_id)
+
+        disam_object_list = sorted(disam_object_list)
+        disam_str = str(disam_object_list).replace('[', '| ').replace(']',' |') if disam_object_list else '|  |'
+
+        format_line = belief_state + text[:pos_start+1] + ' ' + coref_str + ' ' + disam_str + ' <EOB>' + text[pos_end:]
+        format_lines.append(format_line)
+
+    with open(output_file, "w") as f_out:
+        f_out.write("\n".join(format_lines))
+
+
+def convert_taowang_result_to_submit_txt_file_from_dir(input_dir, output_dir):
+
+    os.makedirs(output_dir, exist_ok=True)
+    input_file_path_list = [path for path in sorted(glob.glob(os.path.join(input_dir+"/**/", "*.out.proc"), recursive=True))]
+
+    for input_file in input_file_path_list:
+        epoch_name = input_file.split("/")[-2]
+        output_file = os.path.join(output_dir, "pred-results-of-"+epoch_name+".txt")
+        convert_taowang_result_to_submit_txt_file(input_file, output_file)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_dir', type=str, help="the directory of the SIMMC Dataset.")
@@ -594,12 +789,30 @@ if __name__ == '__main__':
     parser.add_argument("--context_before_objects", action="store_true", help="context_before_objects")
     parser.add_argument("--objects_before_context", action="store_true", help="objects_before_context")
     parser.add_argument("--use_system_transcript_annotated", action="store_true", help="use_system_transcript_annotated")
+    parser.add_argument("--predict_only_final_turn_system_transcript", action="store_true", help="predict_only_final_turn_system_transcript")
     parser.add_argument('--with_target', type=int, default=1)
     parser.add_argument('--output_disambiguation_label', type=str, default=None) # .txt file
     parser.add_argument('--output_path_response', type=str, default=None) # .txt file
     parser.add_argument('--output_path_scene_name', type=str, default=None) # .txt file
     parser.add_argument('--output_path_system_act', type=str, default=None) # .txt file
     parser.add_argument('--output_path_user_act', type=str, default=None) # .txt file
+    parser.add_argument('--output_inference_json', type=str, default=None) # .json file
+    parser.add_argument('--output_inference_disambiguation', type=str, default=None) # .json file
+    parser.add_argument('--input_path_all_turn_predict_lines', type=str, default=None) # .txt file
+    parser.add_argument('--output_path_final_turn_predict_lines', type=str, default=None) # .txt file
+    parser.add_argument('--output_multimodal_context_json', type=str, default=None) # .json file
+
+    parser.add_argument('--input_line_by_line_txt_file', type=str, default=None) # .txt file
+    parser.add_argument('--output_parse_flattened_results_json_file', type=str, default=None) # .json file
+
+    parser.add_argument('--input_line_by_line_out_proc_file', type=str, default=None) # 涛哥那边输出的模型预测结果文件.out.proc
+    parser.add_argument('--output_line_by_line_txt_file', type=str, default=None) # 涛哥那边输出的模型预测结果文件.out.proc
+
+    parser.add_argument('--input_line_by_line_out_proc_file_dir', type=str, default=None) # 涛哥那边输出的模型预测结果文件.out.proc
+    parser.add_argument('--output_line_by_line_txt_file_dir', type=str, default=None) # 涛哥那边输出的模型预测结果文件.out.proc
+
+
+
     args = parser.parse_args()
 
     if args.context_before_objects and args.objects_before_context:
@@ -613,6 +826,61 @@ if __name__ == '__main__':
         args.revert = 1
 
     print(args)
+
+
+    # 将涛哥那边的文件转换为标准输出
+    if args.input_line_by_line_out_proc_file is not None and args.output_line_by_line_txt_file is not None:
+        convert_taowang_result_to_submit_txt_file(input_file=args.input_line_by_line_out_proc_file, output_file=args.output_line_by_line_txt_file)
+
+    if args.input_line_by_line_out_proc_file_dir is not None and args.output_line_by_line_txt_file_dir is not None:
+        convert_taowang_result_to_submit_txt_file_from_dir(input_dir=args.input_line_by_line_out_proc_file_dir,
+                                                           output_dir=args.output_line_by_line_txt_file_dir)
+
+
+
+    if args.input_path_json is not None and args.input_line_by_line_txt_file is not None and args.output_parse_flattened_results_json_file is not None:
+        with open(args.input_path_json, "r") as f_in:
+            json_predicted = json.load(f_in)
+        
+        parse_flattened_results = parse_flattened_results_from_file(args.input_line_by_line_txt_file)
+
+        with open(args.input_line_by_line_txt_file, 'r') as f:
+            lines = f.readlines()
+
+        i = 0
+        for dialog in json_predicted['dialogue_data']:
+            for turn_idx, turn in enumerate(dialog['dialogue']):
+                #print(i, ' ', parse_flattened_results[i])
+                if len(parse_flattened_results[i]) == 0:
+                    print("当前异常的行位置：", i+1)
+                    print("当前异常的输出：", lines[i])
+
+                    turn["transcript_annotated"] = {
+                        "act": "Unknown",
+                        "act_attributes": {
+                            "slot_values": {},
+                            "request_slots": [],
+                            "objects": []
+                        },
+                        "disambiguation_candidates": []
+                    }
+                    i = i+1
+
+                else:
+                    turn["transcript_annotated"] = {
+                        "act": parse_flattened_results[i][0]['act'],
+                        "act_attributes": {
+                            "slot_values": dict(parse_flattened_results[i][0]['slots']),
+                            "request_slots": parse_flattened_results[i][0]['request_slots'],
+                            "objects": parse_flattened_results[i][0]['objects']
+                        },
+                        "disambiguation_candidates": parse_flattened_results[i][0]['disambiguation_candidates']
+                    }
+                    i = i+1
+
+        with open(args.output_parse_flattened_results_json_file, "w") as json_file:
+            json.dump(json_predicted, json_file, indent=4)
+
     if args.output_disambiguation_label is not None:
         # 创建simmc2.1_dials_dstc11_train_disambiguation_label.txt文件
         with open(args.input_path_json, "r") as f_in:
@@ -697,6 +965,56 @@ if __name__ == '__main__':
                 else:
                     f.write(str(lines[i]))
 
+    if args.output_multimodal_context_json is not None:
+        with open(args.input_path_json, "r") as f_in:
+            json_data = json.load(f_in)
+
+        print("Data version is: ", json_data["version"])
+        lines = format_multimodal_context(json_data["dialogue_data"])
+        with open(args.output_multimodal_context_json, "w") as json_file:
+            json.dump(lines, json_file, indent=4)
+
+
+
+
+
+
+    if args.output_inference_json is not None:
+        # 创建inference_disambiguation文件用于评估
+        with open(args.input_path_json, "r") as f_in:
+            json_data = json.load(f_in)
+
+        print("Data version is: ", json_data["version"])
+        lines = format_dialogue_subtask4_inference(json_data["dialogue_data"], predict_only_final_turn_system_transcript=args.predict_only_final_turn_system_transcript)
+        with open(args.output_inference_json, "w") as json_file:
+            json.dump(lines, json_file, indent=4)
+
+    if args.output_inference_disambiguation is not None:
+        # 创建inference_disambiguation文件用于评估
+        with open(args.input_path_json, "r") as f_in:
+            json_data = json.load(f_in)
+
+        print("Data version is: ", json_data["version"])
+        lines = format_inference_disambiguation(json_data["dialogue_data"])
+        with open(args.output_inference_disambiguation, "w") as json_file:
+            json.dump(lines, json_file, indent=4)
+
+    if args.input_path_all_turn_predict_lines is not None and args.output_path_final_turn_predict_lines is not None:
+        with open(args.input_path_json, "r") as f_in:
+            json_data = json.load(f_in)
+        
+        predict_lines = []
+        all_turn_predict_lines =  open(args.input_path_all_turn_predict_lines, encoding="utf-8")
+        for line in all_turn_predict_lines.read().splitlines():
+            if (len(line) > 0 and not line.isspace()):
+                predict_lines.append(line)
+        
+        final_turn_predict_lines = extract_final_turn_predict_from_all_turn_predict(json_data["dialogue_data"], predict_lines)
+
+        with open(args.output_path_final_turn_predict_lines, "w") as f:
+            f.write("\n".join(final_turn_predict_lines))
+
+
     if args.output_path_predict is not None and args.output_path_target is not None:
         convert_json_to_flattened(
             args.input_path_json,
@@ -711,4 +1029,5 @@ if __name__ == '__main__':
             insert_bbox_coords=args.insert_bbox_coords,
             revert=args.revert,
             with_target=args.with_target,
-            use_system_transcript_annotated=args.use_system_transcript_annotated)
+            use_system_transcript_annotated=args.use_system_transcript_annotated,
+            predict_only_final_turn_system_transcript=args.predict_only_final_turn_system_transcript)

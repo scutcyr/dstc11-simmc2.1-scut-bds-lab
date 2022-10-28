@@ -36,7 +36,7 @@ parser.add_argument(
     "--model_type",
     default="mt-bart-large",
     type=str,
-    choices=['gpt-2', 'mt-bart-large', 'mt-bart-large-disamb', 'mt-bart_joint_disam_coref', 'mt-bart_add_intent',
+    choices=['gpt-2', 'mt-bart-large', 'mt-bart-large-disamb', 'mt-bart-attr', 'mt-bart_joint_disam_coref', 'mt-bart_add_intent',
                 'mt-blenderbot', 'mt-t5', 'mt-ul2', 'mt-flava', 'gen-ofa', 'mt-ofa'],
     help="The model architecture to be trained or fine-tuned.(设置模型的类型)",
 )
@@ -200,4 +200,29 @@ parser.add_argument(
     action="store_true",
     default=False,
     help="指定该参数时，如果已经存在args.path_output，则不重新进行推理，直接利用之前已经生成的·结果计算模型评分",
+)
+
+# 用于OFA模型
+parser.add_argument('--sample_patch_num', type=int, default=256, help="图像部分的patch数量")
+
+# 训练模型用到的数据文件路径
+parser.add_argument(
+    "--data_dir",
+    type=str,
+    default="/yrfs1/intern/yrchen5/dstc11_simmc2.1_iflytek/data",
+    help='the path of the dataset'
+)
+
+parser.add_argument(
+    "--cal_diff_f1_based_on_previously_mentioned",
+    action="store_true",
+    default=False,
+    help="指定该参数时，根据object_id是否属于previously_mentioned进行分类，然后计算F1",
+)
+
+parser.add_argument(
+    "--multimodal_context_json_file",
+    type=str,
+    default=None,
+    help='multimodal_context_json_file'
 )

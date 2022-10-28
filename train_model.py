@@ -108,6 +108,7 @@ from models.simmc21_bart import MultiTaskBartForConditionalGeneration # 没有�
 from models.simmc21_bart import MultiTaskBartForConditionalGenerationWithDisamb # 有歧义候选识别任务
 from models.simmc21_bart import MultiTaskBartForConditionalGenerationJointDisambCoref
 from models.simmc21_bart import MultiTaskBartForConditionalGenerationWithDisambAndIntent
+from models.simmc21_bart import MultiTaskBartForConditionalGenerationWithDisambUseAttr
 from models.simmc21_blenderbot import MultiTaskBlenderbotForConditionalGeneration, SIMMC21BlenderbotTokenizer
 from models.simmc21_t5 import MultiTaskT5ForConditionalGeneration, SIMMC21T5Tokenizer
 from models.simmc21_ul2 import MultiTaskUL2ForConditionalGeneration, UL2Tokenizer
@@ -128,6 +129,7 @@ from utils.metadata import (FASHION_SIZES, FASHION_AVAILABLE_SIZES, FASHION_BRAN
     FURNITURE_PRICE, FURNITURE_CUSTOMER_RATING)
 from utils.simmc21_dataset_from_single_file import LineByLineDatasetFromSingleFile # 适合涛哥预处理的数据集文件读取
 from utils.simmc21_dataset_from_single_file_for_ofa import LineByLineDatasetFromSingleFileForOFA
+from utils.simmc21_dataset_add_attr_embedding import LineByLineDatasetWithOBJList, get_dataset_with_obj_attr
 
 from train_model_args import parser # 导入模型所需参数
 
@@ -350,67 +352,120 @@ def train(args, model, tokenizer, all_objects_meta, train_dataset, eval_dataset=
         os.makedirs(args.output_dir, exist_ok=True)
         tb_writer = SummaryWriter(log_dir=args.output_dir)
 
-    def collate_train(examples):
-        '''
-        # 兼容2022.09.02之前的版本的collate_bart
-        # 可根据examples的size判别为不同的输入
-        # examples: [(),(),(), ...]
-        '''
-        #print("len(examples[0])=", len(examples[0]))
-        enc_input = list(map(lambda x: x[0], examples))
-        enc_attention_mask = list(map(lambda x: x[1], examples))
-        decoder_input = list(map(lambda x: x[2], examples))
-        boxes = list(map(lambda x: x[3], examples))  
-        misc = list(map(lambda x: x[4], examples))
-        nocoref = list(map(lambda x: x[5], examples))
-        disambiguation_labels = list(map(lambda x: x[6], examples)) # in get_dataset_jointdisamandcoref, this represent disam_and_coref_labels
-        response = list(map(lambda x: x[7], examples))
-        if len(examples[0])>8:
-            disam = list(map(lambda x: x[8], examples))
-        else:
-            disam = None
-        
-        if len(examples[0])>9:
-            # in get_dataset_jointdisamandcoref, this represent user_act_labels
-            image_feature = list(map(lambda x: x[9], examples))
-            #print("image_feature=", image_feature)
-            if (len(image_feature[0].size())<=1):
-                image_feature_pad = torch.vstack(image_feature)
+
+    if args.model_type == 'mt-bart-attr':
+        def collate_train(examples):
+            '''
+            # 兼容2022.09.02之前的版本的collate_bart
+            # 可根据examples的size判别为不同的输入
+            # examples: [(),(),(), ...]
+            '''
+            #print("len(examples[0])=", len(examples[0]))
+            enc_input = list(map(lambda x: x[0], examples))
+            enc_attention_mask = list(map(lambda x: x[1], examples))
+            decoder_input = list(map(lambda x: x[2], examples))
+            boxes = list(map(lambda x: x[3], examples))  
+            misc = list(map(lambda x: x[4], examples))
+            nocoref = list(map(lambda x: x[5], examples))
+            disambiguation_labels = list(map(lambda x: x[6], examples)) # in get_dataset_jointdisamandcoref, this represent disam_and_coref_labels
+            response = list(map(lambda x: x[7], examples))
+            if len(examples[0])>8:
+                disam = list(map(lambda x: x[8], examples))
             else:
-                image_feature_pad = pad_sequence(image_feature, batch_first=True, padding_value=0) # torch.Size([batch_size, 3, 224, 224]) or torch.Size([batch_size, 3, 480, 480])
-        else:
-            image_feature_pad = None
-        
-        if len(examples[0])>10:
-            # in get_dataset_jointdisamandcoref, this represent system_act_labels
-            enc_token_type_ids = list(map(lambda x: x[10], examples))
-            if (len(enc_token_type_ids[0].size())<=1):
-                enc_token_type_ids_pad = torch.vstack(enc_token_type_ids)
+                disam = None
+            if len(examples[0])>9:
+                obj_ids_per_line = list(map(lambda x: x[9], examples))
             else:
-                enc_token_type_ids_pad = pad_sequence(enc_token_type_ids, batch_first=True, padding_value=0)
-        else:
-            enc_token_type_ids_pad = None
+                obj_ids_per_line = None
 
-        if tokenizer._pad_token is None:
-            enc_input_pad = pad_sequence(enc_input, batch_first=True)
-        else:
-            enc_input_pad = pad_sequence(enc_input, batch_first=True, padding_value=tokenizer.pad_token_id)
-        
-        enc_attention_pad = pad_sequence(enc_attention_mask, batch_first=True, padding_value=0) # 0表示被mask掉
-        decoder_input_pad = tokenizer(decoder_input, padding="longest", truncation=True, return_tensors="pt")
-        response_pad = tokenizer(response, padding="longest", truncation=True, return_tensors="pt")
+            if len(examples[0])>10:
+                object_attr_input_ids_per_line = list(map(lambda x: x[10], examples))
+            else:
+                object_attr_input_ids_per_line = None
 
-        if len(examples[0])>10: # 增加图像特征，增加token_type_ids
+            if tokenizer._pad_token is None:
+                enc_input_pad = pad_sequence(enc_input, batch_first=True)
+            else:
+                enc_input_pad = pad_sequence(enc_input, batch_first=True, padding_value=tokenizer.pad_token_id)
+            
+            enc_attention_pad = pad_sequence(enc_attention_mask, batch_first=True, padding_value=0) # 0表示被mask掉
+            decoder_input_pad = tokenizer(decoder_input, padding="longest", truncation=True, return_tensors="pt")
+            response_pad = tokenizer(response, padding="longest", truncation=True, return_tensors="pt")
+
+            if len(examples[0])>10: # 增加obj_ids_per_line, object_attr_input_ids_per_line
+                return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
+                        boxes, misc, nocoref, torch.vstack(disambiguation_labels), response_pad.input_ids, response_pad.attention_mask, \
+                        obj_ids_per_line, object_attr_input_ids_per_line
+
+            elif len(examples[0])>9: # obj_ids_per_line
+                return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
+                        boxes, misc, nocoref, torch.vstack(disambiguation_labels), response_pad.input_ids, response_pad.attention_mask, obj_ids_per_line
+            # 2022.09.02之前的版本输出
             return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
-                    boxes, misc, nocoref, torch.vstack(disambiguation_labels), response_pad.input_ids, response_pad.attention_mask, \
-                    image_feature_pad, enc_token_type_ids_pad
+                    boxes, misc, nocoref, torch.vstack(disambiguation_labels), response_pad.input_ids, response_pad.attention_mask
 
-        elif len(examples[0])>9: # 增加图像特征
+    else:
+        def collate_train(examples):
+            '''
+            # 兼容2022.09.02之前的版本的collate_bart
+            # 可根据examples的size判别为不同的输入
+            # examples: [(),(),(), ...]
+            '''
+            #print("len(examples[0])=", len(examples[0]))
+            enc_input = list(map(lambda x: x[0], examples))
+            enc_attention_mask = list(map(lambda x: x[1], examples))
+            decoder_input = list(map(lambda x: x[2], examples))
+            boxes = list(map(lambda x: x[3], examples))  
+            misc = list(map(lambda x: x[4], examples))
+            nocoref = list(map(lambda x: x[5], examples))
+            disambiguation_labels = list(map(lambda x: x[6], examples)) # in get_dataset_jointdisamandcoref, this represent disam_and_coref_labels
+            response = list(map(lambda x: x[7], examples))
+            if len(examples[0])>8:
+                disam = list(map(lambda x: x[8], examples))
+            else:
+                disam = None
+            
+            if len(examples[0])>9:
+                # in get_dataset_jointdisamandcoref, this represent user_act_labels
+                image_feature = list(map(lambda x: x[9], examples))
+                #print("image_feature=", image_feature)
+                if (len(image_feature[0].size())<=1):
+                    image_feature_pad = torch.vstack(image_feature)
+                else:
+                    image_feature_pad = pad_sequence(image_feature, batch_first=True, padding_value=0) # torch.Size([batch_size, 3, 224, 224]) or torch.Size([batch_size, 3, 480, 480])
+            else:
+                image_feature_pad = None
+            
+            if len(examples[0])>10:
+                # in get_dataset_jointdisamandcoref, this represent system_act_labels
+                enc_token_type_ids = list(map(lambda x: x[10], examples))
+                if (len(enc_token_type_ids[0].size())<=1):
+                    enc_token_type_ids_pad = torch.vstack(enc_token_type_ids)
+                else:
+                    enc_token_type_ids_pad = pad_sequence(enc_token_type_ids, batch_first=True, padding_value=0)
+            else:
+                enc_token_type_ids_pad = None
+
+            if tokenizer._pad_token is None:
+                enc_input_pad = pad_sequence(enc_input, batch_first=True)
+            else:
+                enc_input_pad = pad_sequence(enc_input, batch_first=True, padding_value=tokenizer.pad_token_id)
+            
+            enc_attention_pad = pad_sequence(enc_attention_mask, batch_first=True, padding_value=0) # 0表示被mask掉
+            decoder_input_pad = tokenizer(decoder_input, padding="longest", truncation=True, return_tensors="pt")
+            response_pad = tokenizer(response, padding="longest", truncation=True, return_tensors="pt")
+
+            if len(examples[0])>10: # 增加图像特征，增加token_type_ids
+                return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
+                        boxes, misc, nocoref, torch.vstack(disambiguation_labels), response_pad.input_ids, response_pad.attention_mask, \
+                        image_feature_pad, enc_token_type_ids_pad
+
+            elif len(examples[0])>9: # 增加图像特征
+                return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
+                        boxes, misc, nocoref, torch.vstack(disambiguation_labels), response_pad.input_ids, response_pad.attention_mask, image_feature_pad
+            # 2022.09.02之前的版本输出
             return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
-                    boxes, misc, nocoref, torch.vstack(disambiguation_labels), response_pad.input_ids, response_pad.attention_mask, image_feature_pad
-        # 2022.09.02之前的版本输出
-        return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
-                boxes, misc, nocoref, torch.vstack(disambiguation_labels), response_pad.input_ids, response_pad.attention_mask
+                    boxes, misc, nocoref, torch.vstack(disambiguation_labels), response_pad.input_ids, response_pad.attention_mask
 
     train_sampler = RandomSampler(train_dataset) if args.local_rank == -1 or args.model_parallel else DistributedSampler(train_dataset)
     train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size, collate_fn=collate_train)
@@ -560,6 +615,10 @@ def train(args, model, tokenizer, all_objects_meta, train_dataset, eval_dataset=
                     system_act_labels = batch[11].to(model.encoder.first_device)
                 elif args.model_type == 'gen-ofa' or args.model_type == 'mt-ofa':
                     image_feature = batch[10].to(model.encoder.first_device)
+                elif args.model_type == 'mt-bart-attr':
+                    obj_ids_per_line = batch[10]
+                    object_attr_input_ids = batch[11]
+
             else:
                 enc_input = batch[0].to(args.device)
                 enc_attention_mask = batch[1].to(args.device)
@@ -579,6 +638,9 @@ def train(args, model, tokenizer, all_objects_meta, train_dataset, eval_dataset=
                     system_act_labels = batch[11].to(args.device)
                 elif args.model_type == 'gen-ofa' or args.model_type == 'mt-ofa':
                     image_feature = batch[10].to(args.device)
+                elif args.model_type == 'mt-bart-attr':
+                    obj_ids_per_line = batch[10]
+                    object_attr_input_ids = batch[11]
             
             # 对labels的特殊处理
             # 修复原先的bug: labels=decoder_input[:, 1:].contiguous(), 此时pad填充的是pad_token_id，并非-100，计算loss时会把pad部分也计算进去
@@ -756,7 +818,8 @@ def train(args, model, tokenizer, all_objects_meta, train_dataset, eval_dataset=
                             attention_mask=decoder_attention_mask[:, :-1],  # attention mask for decoding.
                             labels=lm_labels,
                             boxes=boxes,
-                            misc=misc)
+                            misc=misc,
+                            sample_patch_num=args.sample_patch_num)
                 if args.do_rdrop:
                     model_outputs2 = model(
                             input_ids=enc_input,
@@ -765,7 +828,8 @@ def train(args, model, tokenizer, all_objects_meta, train_dataset, eval_dataset=
                             attention_mask=decoder_attention_mask[:, :-1],  # attention mask for decoding.
                             labels=lm_labels,
                             boxes=boxes,
-                            misc=misc)
+                            misc=misc,
+                            sample_patch_num=args.sample_patch_num)
             elif args.model_type == 'mt-ofa':
                 model_outputs = model(
                             input_ids=enc_input,
@@ -787,7 +851,8 @@ def train(args, model, tokenizer, all_objects_meta, train_dataset, eval_dataset=
                             alpha_coref_loss= args.alpha_coref_loss,
                             use_focal_loss=args.use_focal_loss,
                             focal_loss_gamma=args.focal_loss_gamma,
-                            focal_loss_alpha=args.focal_loss_alpha
+                            focal_loss_alpha=args.focal_loss_alpha,
+                            sample_patch_num=args.sample_patch_num
                             )
                 if args.do_rdrop:
                     model_outputs2 = model(
@@ -810,9 +875,64 @@ def train(args, model, tokenizer, all_objects_meta, train_dataset, eval_dataset=
                             alpha_coref_loss= args.alpha_coref_loss,
                             use_focal_loss=args.use_focal_loss,
                             focal_loss_gamma=args.focal_loss_gamma,
-                            focal_loss_alpha=args.focal_loss_alpha
+                            focal_loss_alpha=args.focal_loss_alpha,
+                            sample_patch_num=args.sample_patch_num
                             )
 
+            elif args.model_type == 'mt-bart-attr':
+                model_outputs = model(
+                            input_ids=enc_input,
+                            attention_mask=enc_attention_mask,
+                            decoder_input_ids=decoder_input[:, :-1],
+                            decoder_attention_mask=decoder_attention_mask[:, :-1],
+                            labels=lm_labels,
+                            boxes=boxes,
+                            misc=misc,
+                            nocoref=nocoref,
+                            response=response,
+                            response_attention_mask=response_attention_mask,
+                            disambiguation_labels=disambiguation_labels,
+                            do_retrieval=args.do_retrieval,
+                            return_dict=return_dict,
+                            alpha_masked_lm_loss= args.alpha_masked_lm_loss, # 新增，生成回复的损失占比
+                            alpha_nocoref_loss= args.alpha_nocoref_loss, # 新增，二分类任务判断是否存在共指消解的损失占比
+                            alpha_misc_loss= args.alpha_misc_loss, # 新增，属性识别损失占比
+                            alpha_disam_loss= args.alpha_disam_loss, # 新增，歧义句子分类损失占比
+                            alpha_retrieval_loss= args.alpha_retrieval_loss, # 新增，检索回复损失占比
+                            alpha_disamb_candi_loss= args.alpha_disamb_candi_loss, # 新增，识别对象是否为歧义候选的损失占比
+                            alpha_coref_loss= args.alpha_coref_loss,
+                            use_focal_loss=args.use_focal_loss,
+                            focal_loss_gamma=args.focal_loss_gamma,
+                            focal_loss_alpha=args.focal_loss_alpha,
+                            object_attr_input_ids=object_attr_input_ids,
+                            use_non_visual_attrs=True)    
+                if args.do_rdrop:
+                    model_outputs2 = model(
+                            input_ids=enc_input,
+                            attention_mask=enc_attention_mask,
+                            decoder_input_ids=decoder_input[:, :-1],
+                            decoder_attention_mask=decoder_attention_mask[:, :-1],
+                            labels=lm_labels,
+                            boxes=boxes,
+                            misc=misc,
+                            nocoref=nocoref,
+                            response=response,
+                            response_attention_mask=response_attention_mask,
+                            disambiguation_labels=disambiguation_labels,
+                            do_retrieval=args.do_retrieval,
+                            return_dict=return_dict,
+                            alpha_masked_lm_loss= args.alpha_masked_lm_loss, # 新增，生成回复的损失占比
+                            alpha_nocoref_loss= args.alpha_nocoref_loss, # 新增，二分类任务判断是否存在共指消解的损失占比
+                            alpha_misc_loss= args.alpha_misc_loss, # 新增，属性识别损失占比
+                            alpha_disam_loss= args.alpha_disam_loss, # 新增，歧义句子分类损失占比
+                            alpha_retrieval_loss= args.alpha_retrieval_loss, # 新增，检索回复损失占比
+                            alpha_disamb_candi_loss= args.alpha_disamb_candi_loss, # 新增，识别对象是否为歧义候选的损失占比
+                            alpha_coref_loss= args.alpha_coref_loss,
+                            use_focal_loss=args.use_focal_loss,
+                            focal_loss_gamma=args.focal_loss_gamma,
+                            focal_loss_alpha=args.focal_loss_alpha,
+                            object_attr_input_ids=object_attr_input_ids,
+                            use_non_visual_attrs=True)  
 
             else:
                 model_outputs = model(
@@ -1247,67 +1367,114 @@ def evaluate(args, model, tokenizer, all_objects_meta, eval_dataset, prefix=""):
     '''
     验证模型性能
     '''
-    def collate_eval(examples):
-        # 兼容2022.09.02之前的版本的collate_eval_bart
-        # 可根据examples的size判别为不同的输入
-        enc_input = list(map(lambda x: x[0], examples))
-        enc_attention_mask = list(map(lambda x: x[1], examples))
-        decoder_input = list(map(lambda x: x[2], examples))
-        boxes = list(map(lambda x: x[3], examples))  
-        misc = list(map(lambda x: x[4], examples))
-        nocoref = list(map(lambda x: x[5], examples))
-        if len(examples[0])>6:
-            disam = list(map(lambda x: x[6], examples))
-        else:
-            disam = None
-        if len(examples[0])>7:
-            # or disam_and_coref_labels in get_dataset_jointdisamandcoref
-            image_feature = list(map(lambda x: x[7], examples))
-            if (len(image_feature[0].size())<=1):
-                image_feature_pad = torch.vstack(image_feature)
-            else:
-                image_feature_pad = pad_sequence(image_feature, batch_first=True, padding_value=0) # torch.Size([batch_size, 3, 224, 224])
-        else:
-            image_feature_pad = None
-        if len(examples[0])>8:
-            # or user_act_labels in get_dataset_jointdisamandcoref
-            enc_token_type_ids = list(map(lambda x: x[8], examples))
-            if (len(enc_token_type_ids[0].size())<=1):
-                enc_token_type_ids_pad = torch.vstack(enc_token_type_ids)
-            else:
-                enc_token_type_ids_pad = pad_sequence(enc_token_type_ids, batch_first=True, padding_value=0)
-        else:
-            enc_token_type_ids_pad = None
-        if len(examples[0])>9:
-            # in get_dataset_jointdisamandcoref
-            system_act_labels = list(map(lambda x: x[9], examples))
-            if (len(system_act_labels[0].size())<=1):
-                system_act_labels_pad = torch.vstack(system_act_labels)
-            else:
-                system_act_labels_pad = pad_sequence(system_act_labels, batch_first=True, padding_value=0)
 
-        if tokenizer._pad_token is None:
-            enc_input_pad = pad_sequence(enc_input, batch_first=True)
-        else:
-            enc_input_pad = pad_sequence(enc_input, batch_first=True, padding_value=tokenizer.pad_token_id)
-        enc_attention_pad = pad_sequence(enc_attention_mask, batch_first=True, padding_value=0)
-        decoder_input_pad = tokenizer(decoder_input, padding="longest", truncation=True, return_tensors="pt")
+    if args.model_type == 'mt-bart-attr':
+        def collate_eval(examples):
+            # 兼容2022.09.02之前的版本的collate_eval_bart
+            # 可根据examples的size判别为不同的输入
+            enc_input = list(map(lambda x: x[0], examples))
+            enc_attention_mask = list(map(lambda x: x[1], examples))
+            decoder_input = list(map(lambda x: x[2], examples))
+            boxes = list(map(lambda x: x[3], examples))  
+            misc = list(map(lambda x: x[4], examples))
+            nocoref = list(map(lambda x: x[5], examples))
+            if len(examples[0])>6:
+                disam = list(map(lambda x: x[6], examples))
+            else:
+                disam = None
+            if len(examples[0])>7:
+                # or disam_and_coref_labels in get_dataset_jointdisamandcoref
+                obj_ids_per_line = list(map(lambda x: x[7], examples))
+            else:
+                obj_ids_per_line = None
+            if len(examples[0])>8:
+                # or user_act_labels in get_dataset_jointdisamandcoref
+                object_attr_input_ids_per_line = list(map(lambda x: x[8], examples))
+            else:
+                object_attr_input_ids_per_line = None
 
-        if len(examples[0])>9:
-            # system_act_labels
-            return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
-                    boxes, misc, nocoref, disam, image_feature_pad, enc_token_type_ids_pad, system_act_labels_pad
-        elif len(examples[0])>8:
-            # or user_act_labels
-            return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
-                    boxes, misc, nocoref, disam, image_feature_pad, enc_token_type_ids_pad
-        elif len(examples[0])>7:
-            # or disam_and_coref_labels
-            return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
-                    boxes, misc, nocoref, disam, image_feature_pad
+            if tokenizer._pad_token is None:
+                enc_input_pad = pad_sequence(enc_input, batch_first=True)
+            else:
+                enc_input_pad = pad_sequence(enc_input, batch_first=True, padding_value=tokenizer.pad_token_id)
+            enc_attention_pad = pad_sequence(enc_attention_mask, batch_first=True, padding_value=0)
+            decoder_input_pad = tokenizer(decoder_input, padding="longest", truncation=True, return_tensors="pt")
 
-        return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
-                boxes, misc, nocoref, disam
+            if len(examples[0])>8:
+                # or user_act_labels
+                return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
+                        boxes, misc, nocoref, disam, obj_ids_per_line, object_attr_input_ids_per_line
+            elif len(examples[0])>7:
+                # or disam_and_coref_labels
+                return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
+                        boxes, misc, nocoref, disam, obj_ids_per_line
+
+            return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
+                    boxes, misc, nocoref, disam
+
+    else:
+
+        def collate_eval(examples):
+            # 兼容2022.09.02之前的版本的collate_eval_bart
+            # 可根据examples的size判别为不同的输入
+            enc_input = list(map(lambda x: x[0], examples))
+            enc_attention_mask = list(map(lambda x: x[1], examples))
+            decoder_input = list(map(lambda x: x[2], examples))
+            boxes = list(map(lambda x: x[3], examples))  
+            misc = list(map(lambda x: x[4], examples))
+            nocoref = list(map(lambda x: x[5], examples))
+            if len(examples[0])>6:
+                disam = list(map(lambda x: x[6], examples))
+            else:
+                disam = None
+            if len(examples[0])>7:
+                # or disam_and_coref_labels in get_dataset_jointdisamandcoref
+                image_feature = list(map(lambda x: x[7], examples))
+                if (len(image_feature[0].size())<=1):
+                    image_feature_pad = torch.vstack(image_feature)
+                else:
+                    image_feature_pad = pad_sequence(image_feature, batch_first=True, padding_value=0) # torch.Size([batch_size, 3, 224, 224])
+            else:
+                image_feature_pad = None
+            if len(examples[0])>8:
+                # or user_act_labels in get_dataset_jointdisamandcoref
+                enc_token_type_ids = list(map(lambda x: x[8], examples))
+                if (len(enc_token_type_ids[0].size())<=1):
+                    enc_token_type_ids_pad = torch.vstack(enc_token_type_ids)
+                else:
+                    enc_token_type_ids_pad = pad_sequence(enc_token_type_ids, batch_first=True, padding_value=0)
+            else:
+                enc_token_type_ids_pad = None
+            if len(examples[0])>9:
+                # in get_dataset_jointdisamandcoref
+                system_act_labels = list(map(lambda x: x[9], examples))
+                if (len(system_act_labels[0].size())<=1):
+                    system_act_labels_pad = torch.vstack(system_act_labels)
+                else:
+                    system_act_labels_pad = pad_sequence(system_act_labels, batch_first=True, padding_value=0)
+
+            if tokenizer._pad_token is None:
+                enc_input_pad = pad_sequence(enc_input, batch_first=True)
+            else:
+                enc_input_pad = pad_sequence(enc_input, batch_first=True, padding_value=tokenizer.pad_token_id)
+            enc_attention_pad = pad_sequence(enc_attention_mask, batch_first=True, padding_value=0)
+            decoder_input_pad = tokenizer(decoder_input, padding="longest", truncation=True, return_tensors="pt")
+
+            if len(examples[0])>9:
+                # system_act_labels
+                return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
+                        boxes, misc, nocoref, disam, image_feature_pad, enc_token_type_ids_pad, system_act_labels_pad
+            elif len(examples[0])>8:
+                # or user_act_labels
+                return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
+                        boxes, misc, nocoref, disam, image_feature_pad, enc_token_type_ids_pad
+            elif len(examples[0])>7:
+                # or disam_and_coref_labels
+                return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
+                        boxes, misc, nocoref, disam, image_feature_pad
+
+            return enc_input_pad, enc_attention_pad, decoder_input_pad.input_ids, decoder_input_pad.attention_mask, \
+                    boxes, misc, nocoref, disam
 
     eval_sampler = SequentialSampler(eval_dataset)
     eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size, collate_fn=collate_eval)
@@ -1379,6 +1546,10 @@ def evaluate(args, model, tokenizer, all_objects_meta, eval_dataset, prefix=""):
             disambiguation_labels = batch[8].to(args.device)
             user_act_labels = batch[9].to(args.device)
             system_act_labels = batch[10].to(args.device)
+        elif args.model_type == 'mt-bart-attr':
+            obj_ids_per_line = batch[8]
+            object_attr_input_ids = batch[9]
+
 
         # 对labels的特殊处理
         # 修复原先的bug: labels=decoder_input[:, 1:].contiguous(), 此时pad填充的是pad_token_id，并非-100，计算loss时会把pad部分也计算进去
@@ -1408,7 +1579,8 @@ def evaluate(args, model, tokenizer, all_objects_meta, eval_dataset, prefix=""):
                             attention_mask=decoder_attention_mask[:, :-1],  # attention mask for decoding.
                             labels=lm_labels,
                             boxes=boxes,
-                            misc=misc)
+                            misc=misc,
+                            sample_patch_num=args.sample_patch_num)
             elif args.model_type == 'mt-ofa':
                 model_outputs = model(
                             input_ids=enc_input,
@@ -1418,7 +1590,21 @@ def evaluate(args, model, tokenizer, all_objects_meta, eval_dataset, prefix=""):
                             labels=lm_labels,
                             boxes=boxes,
                             misc=misc,
+                            sample_patch_num=args.sample_patch_num,
                             return_dict=True)
+            elif args.model_type == 'mt-bart-attr':
+                model_outputs = model(
+                            input_ids=enc_input,
+                            attention_mask=enc_attention_mask,
+                            decoder_input_ids=decoder_input[:, :-1],
+                            decoder_attention_mask=decoder_attention_mask[:, :-1],
+                            labels=lm_labels,
+                            boxes=boxes,
+                            misc=misc,
+                            nocoref=nocoref,
+                            return_dict=True,
+                            object_attr_input_ids=object_attr_input_ids,
+                            use_non_visual_attrs=True) 
             
             else:
                 model_outputs = model(
@@ -1742,6 +1928,8 @@ def main():
         model_class, tokenizer_class = MultiTaskBartForConditionalGeneration, BartTokenizerFast
     elif args.model_type == 'mt-bart-large-disamb':
         model_class, tokenizer_class = MultiTaskBartForConditionalGenerationWithDisamb, BartTokenizerFast
+    elif args.model_type == 'mt-bart-attr':
+        model_class, tokenizer_class = MultiTaskBartForConditionalGenerationWithDisambUseAttr, BartTokenizerFast
     elif args.model_type == 'mt-bart_joint_disam_coref':
         model_class, tokenizer_class = MultiTaskBartForConditionalGenerationJointDisambCoref, BartTokenizerFast
     elif args.model_type == 'mt-bart_add_intent':
@@ -1882,6 +2070,9 @@ def main():
         elif args.model_type == 'mt-bart_joint_disam_coref' or args.model_type == 'mt-bart_add_intent':
             train_dataset = get_dataset_jointdisamandcoref(args, tokenizer, all_objects_meta, train=True)
             eval_dataset = get_dataset_jointdisamandcoref(args, tokenizer, all_objects_meta, train=False)
+        elif args.model_type == 'mt-bart-attr':
+            train_dataset = get_dataset_with_obj_attr(args, tokenizer, all_objects_meta, train=True)
+            eval_dataset = get_dataset_with_obj_attr(args, tokenizer, all_objects_meta, train=False)
         else:
             train_dataset = get_dataset(args, tokenizer, all_objects_meta, train=True)
             eval_dataset = get_dataset(args, tokenizer, all_objects_meta, train=False)

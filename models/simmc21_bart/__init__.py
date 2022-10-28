@@ -38,4 +38,8 @@ if is_torch_available():
         MultiTaskBartForConditionalGenerationWithDisambAndIntent
     )
 
+    from .modeling_bart_add_attrs_embedding import (
+        MultiTaskBartForConditionalGenerationWithDisambUseAttr
+    )
+
 

@@ -47,7 +47,7 @@ parser.add_argument(
     "--model_type",
     default="mt-bart-large",
     type=str,
-    choices=['gpt-2', 'mt-bart-large', 'mt-bart-large-disamb', 'mt-bart_joint_disam_coref', 'mt-bart_add_intent',
+    choices=['gpt-2', 'mt-bart-large', 'mt-bart-large-disamb', 'mt-bart-attr', 'mt-bart_joint_disam_coref', 'mt-bart_add_intent',
                 'mt-blenderbot', 'mt-t5', 'mt-ul2', 'mt-flava', 'gen-ofa', 'mt-ofa'],
     help="The model architecture to be trained or fine-tuned.",
 )
@@ -441,3 +441,7 @@ parser.add_argument("--focal_loss_alpha", type=float, default=0.25, help="focal_
 parser.add_argument('--freeze_model', action='store_true', help="If True freeze some layers of the model")
 parser.add_argument('--freeze_start_layer', type=int, default=0, help="冻结指定的层范围，格式为start-end，其中start取值范围为0~11，end取值范围为0~11，start<=end")
 parser.add_argument('--freeze_end_layer', type=int, default=11, help="冻结指定的层范围，格式为start-end，其中start取值范围为0~11，end取值范围为0~11，start<=end")
+
+# 用于OFA模型
+parser.add_argument('--sample_patch_num', type=int, default=256, help="图像部分的patch数量")
+

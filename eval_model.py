@@ -88,7 +88,7 @@ from transformers import WEIGHTS_NAME, AutoTokenizer, BartForConditionalGenerati
 
 
 from evaluation_tools.convert import parse_flattened_results_from_file
-from evaluation_tools.evaluate_dst import evaluate_from_flat_list
+from evaluation_tools.evaluate_dst import evaluate_from_flat_list, evaluate_from_flat_list_mentioned_object
 from evaluation_tools.response_evaluation import evaluate_response_generation
 
 # 导入模型类
@@ -96,11 +96,13 @@ from models.simmc21_bart import MultiTaskBartForConditionalGeneration
 from models.simmc21_bart import MultiTaskBartForConditionalGenerationWithDisamb
 from models.simmc21_bart import MultiTaskBartForConditionalGenerationJointDisambCoref
 from models.simmc21_bart import MultiTaskBartForConditionalGenerationWithDisambAndIntent
+from models.simmc21_bart import MultiTaskBartForConditionalGenerationWithDisambUseAttr
 from models.simmc21_blenderbot import MultiTaskBlenderbotForConditionalGeneration, SIMMC21BlenderbotTokenizer
 from models.simmc21_t5 import MultiTaskT5ForConditionalGeneration, SIMMC21T5Tokenizer
 from models.simmc21_ul2 import MultiTaskUL2ForConditionalGeneration, UL2Tokenizer
 from models.simmc21_flava import MultiTaskFlavaModel
 from models.simmc21_ofa import OFAModelForSIMMCGeneration, MultiTaskOFAModelForConditionalGeneration, OFATokenizer
+
 
 # 导入数据处理类
 from utils.simmc21_dataset import (get_input_id, id_converter, GenerationDataset, get_dataset, 
@@ -114,6 +116,7 @@ from utils.simmc21_dataset_joint_disam_coref import (LineByLineDatasetJointDisam
 from utils.simmc21_dataset_for_ofa import (LineByLineDatasetForOFA, GenerationDatasetForOFA, get_dataset_for_ofa)
 from utils.simmc21_dataset_from_single_file import LineByLineDatasetFromSingleFile # 适合涛哥预处理的数据集文件读取
 from utils.simmc21_dataset_from_single_file_for_ofa import LineByLineDatasetFromSingleFileForOFA
+from utils.simmc21_dataset_add_attr_embedding import GenerationDatasetAddAttr
 
 from eval_model_args import parser # 导入模型所需参数
 
@@ -352,29 +355,50 @@ def evaluate(args, model, tokenizer, prefix="",bad_words_ids=None, test_dataset=
         fashion_enc_head = model.fashion_enc_head
         furniture_enc_head = model.furniture_enc_head
 
-    def collate_bart(examples):
-        enc_input = list(map(lambda x: x[0], examples))
-        enc_attention_mask = list(map(lambda x: x[1], examples))
-        original_lines = list(map(lambda x: x[2], examples))
-        boxes = list(map(lambda x: x[3], examples))
-        misc = list(map(lambda x: x[4], examples))
-        nocoref = list(map(lambda x: x[5], examples))
-        disam = list(map(lambda x: x[6], examples))
-        if len(examples[0])>7:
-            image_feature = list(map(lambda x: x[7], examples))
-            if (len(image_feature[0].size())<=1):
-                image_feature_pad = torch.vstack(image_feature)
-            else:
-                image_feature_pad = pad_sequence(image_feature, batch_first=True, padding_value=0) # torch.Size([batch_size, 3, 224, 224])
-        else:
-            image_feature_pad = None
+    if args.model_type == 'mt-bart-attr':
+        def collate_bart(examples):
+            enc_input = list(map(lambda x: x[0], examples))
+            enc_attention_mask = list(map(lambda x: x[1], examples))
+            original_lines = list(map(lambda x: x[2], examples))
+            boxes = list(map(lambda x: x[3], examples))
+            misc = list(map(lambda x: x[4], examples))
+            nocoref = list(map(lambda x: x[5], examples))
+            disam = list(map(lambda x: x[6], examples))
+            obj_ids_per_line = list(map(lambda x: x[7], examples))
+            object_attr_input_ids_per_line = list(map(lambda x: x[8], examples))
 
-        if tokenizer._pad_token is None:
-            enc_input_pad = pad_sequence(enc_input, batch_first=True)
-        else:
-            enc_input_pad = pad_sequence(enc_input, batch_first=True, padding_value=tokenizer.pad_token_id)
-        enc_attention_pad = pad_sequence(enc_attention_mask, batch_first=True, padding_value=0) # 0表示mask
-        return enc_input_pad, enc_attention_pad, original_lines, boxes, misc, nocoref, disam, image_feature_pad
+            if tokenizer._pad_token is None:
+                enc_input_pad = pad_sequence(enc_input, batch_first=True)
+            else:
+                enc_input_pad = pad_sequence(enc_input, batch_first=True, padding_value=tokenizer.pad_token_id)
+            enc_attention_pad = pad_sequence(enc_attention_mask, batch_first=True, padding_value=0) # 0表示mask
+            return enc_input_pad, enc_attention_pad, original_lines, boxes, misc, nocoref, disam, obj_ids_per_line, object_attr_input_ids_per_line
+
+    else:
+
+        def collate_bart(examples):
+            enc_input = list(map(lambda x: x[0], examples))
+            enc_attention_mask = list(map(lambda x: x[1], examples))
+            original_lines = list(map(lambda x: x[2], examples))
+            boxes = list(map(lambda x: x[3], examples))
+            misc = list(map(lambda x: x[4], examples))
+            nocoref = list(map(lambda x: x[5], examples))
+            disam = list(map(lambda x: x[6], examples))
+            if len(examples[0])>7:
+                image_feature = list(map(lambda x: x[7], examples))
+                if (len(image_feature[0].size())<=1):
+                    image_feature_pad = torch.vstack(image_feature)
+                else:
+                    image_feature_pad = pad_sequence(image_feature, batch_first=True, padding_value=0) # torch.Size([batch_size, 3, 224, 224])
+            else:
+                image_feature_pad = None
+
+            if tokenizer._pad_token is None:
+                enc_input_pad = pad_sequence(enc_input, batch_first=True)
+            else:
+                enc_input_pad = pad_sequence(enc_input, batch_first=True, padding_value=tokenizer.pad_token_id)
+            enc_attention_pad = pad_sequence(enc_attention_mask, batch_first=True, padding_value=0) # 0表示mask
+            return enc_input_pad, enc_attention_pad, original_lines, boxes, misc, nocoref, disam, image_feature_pad
     
     with open(args.item2id, 'r') as f:
         item2id = json.load(f)
@@ -402,6 +426,11 @@ def evaluate(args, model, tokenizer, prefix="",bad_words_ids=None, test_dataset=
             if args.model_type == 'gen-ofa' or args.model_type == 'mt-ofa':
                 image_feature = batch[7].to(model.encoder.first_device)
 
+            if args.model_type == 'mt-bart-attr':
+                obj_ids_per_line = batch[7]
+                object_attr_input_ids = batch[8]
+
+
             batch_size = len(misc)
             decoder_input_ids = torch.full([batch_size,1], model.config.decoder_start_token_id).to(model.encoder.first_device)
 
@@ -415,6 +444,11 @@ def evaluate(args, model, tokenizer, prefix="",bad_words_ids=None, test_dataset=
             disam = batch[6]
             if args.model_type == 'gen-ofa' or args.model_type == 'mt-ofa':
                 image_feature = batch[7].to(args.device)
+            
+            if args.model_type == 'mt-bart-attr':
+                obj_ids_per_line = batch[7]
+                object_attr_input_ids = batch[8]
+            
             batch_size = len(misc)
             
             decoder_input_ids = torch.full([batch_size,1], model.config.decoder_start_token_id).to(args.device)
@@ -545,6 +579,23 @@ def evaluate(args, model, tokenizer, prefix="",bad_words_ids=None, test_dataset=
                         for obj_idx in range(len(misc[b_idx])):
                             pos = misc[b_idx][obj_idx]['pos']
                             inputs_embeds[b_idx][pos] += box_embedded[obj_idx]
+                    
+                        if args.model_type == 'mt-bart-attr':
+                            #for line_object_attr_input_ids in object_attr_input_ids:
+                            line_object_embeddings = []
+                            for object_attr_input_id in object_attr_input_ids[b_idx]:  # (obj_num, attr_num, 1)
+                                # object_attr_input_id: [tensor([50847]), tensor([50863]), tensor([50910]), tensor([448])]
+                                object_embeddings = [torch.sum(model.model.encoder.embed_tokens(obj_tok.to(inputs_embeds.device)), dim=0) # summing over columns handling multiple integer tokens
+                                                        for obj_tok in object_attr_input_id]
+                                # object_embeddings: [torch.Tensor([, ...]), ...] size: (attr_num, 768)
+                                line_object_embeddings.append(object_embeddings) # size: (obj_num, attr_num, 768)
+
+                            # 将line_object_embeddings叠加到inputs_embeds当中
+                            for idx, abs_id_embs in enumerate(line_object_embeddings):
+                                pos = misc[b_idx][idx]['pos']
+                                for embs in abs_id_embs:
+                                    inputs_embeds[b_idx][pos] += torch.reshape(embs, (-1,))
+                    
                     encoder_outputs = model.model.encoder(inputs_embeds=inputs_embeds, attention_mask=enc_input_attention, return_dict=True)  # check this line
             
                 enc_last_hidden_state = encoder_outputs.last_hidden_state
@@ -743,6 +794,8 @@ def main():
             model_class, tokenizer_class = MultiTaskBartForConditionalGeneration, BartTokenizerFast
         elif args.model_type == 'mt-bart-large-disamb':
             model_class, tokenizer_class = MultiTaskBartForConditionalGenerationWithDisamb, BartTokenizerFast
+        elif args.model_type == 'mt-bart-attr':
+            model_class, tokenizer_class = MultiTaskBartForConditionalGenerationWithDisambUseAttr, BartTokenizerFast
         elif args.model_type == 'mt-bart_joint_disam_coref':
             model_class, tokenizer_class = MultiTaskBartForConditionalGenerationJointDisambCoref, BartTokenizerFast
         elif args.model_type == 'mt-bart_add_intent':
@@ -806,6 +859,13 @@ def main():
                                                 use_OBJ=True, 
                                                 image_path_file=args.image_path_file, 
                                                 image_dir=args.image_dir)
+        elif args.model_type == 'mt-bart-attr':
+            test_dataset = GenerationDatasetAddAttr(prompts_from_file=args.prompts_from_file, 
+                                                    tokenizer=tokenizer, 
+                                                    model_type=args.model_type,
+                                                    fashion_meta_file=os.path.join(args.data_dir, "fashion_prefab_metadata_all.json"),
+                                                    furniture_meta_file=os.path.join(args.data_dir, "furniture_prefab_metadata_all.json"))
+
         else:
             test_dataset = GenerationDataset(prompts_from_file=args.prompts_from_file, 
                                             tokenizer=tokenizer, 
@@ -868,6 +928,47 @@ def main():
             result_file_paths[prefix] = file_path # 完整的路径
 
 
+    # 生成用于最终提交的任务4的json文件
+    if args.output_json_response_path is not None:
+
+        os.makedirs(args.output_json_response_path, exist_ok=True)
+
+        for prefix, input_path_predicted in result_file_paths.items():
+            # Convert the data from the GPT-2 friendly format to JSON
+            list_predicted = parse_flattened_results_from_file(input_path_predicted)
+            # Subtask 4
+            with open(args.data_json_path, "r") as file_id:
+                gt_responses = json.load(file_id)
+
+            #print(gt_responses)
+            #print(gt_responses[0])
+
+            dialog_meta_data = json.load(open(args.dialog_meta_data)) # List[Dict]
+
+            predicted_response = [] 
+
+            with open(input_path_predicted, 'r') as f:
+                lines = f.readlines()
+                assert len(lines) == len(dialog_meta_data)
+                for line, meta in zip(lines, dialog_meta_data):
+                    response = line.split("<EOB>")[1].split("<EOS>")[0].strip()
+                    predicted_response.append({
+                        "dialog_id" : meta["dialog_id"],
+                        "predictions" : [{
+                            "turn_id" : meta["turn_id"],
+                            "response" : response
+                        }]
+                    })
+
+            if prefix:
+                json_file_name = prefix+".json"
+            else: # prefix == ""
+                json_file_name = "final_checkpoint"+".json"
+
+            json.dump(predicted_response, open(os.path.join(args.output_json_response_path, json_file_name), "w"), indent=4)
+
+
+
 
     # 计算测试结果
     if args.do_calculate_score:
@@ -877,7 +978,14 @@ def main():
             list_target = parse_flattened_results_from_file(args.input_path_target)
             list_predicted = parse_flattened_results_from_file(input_path_predicted)
             # Evaluate Subtask 1 ~ Subtask 3
-            report = evaluate_from_flat_list(list_target, list_predicted)
+            if args.cal_diff_f1_based_on_previously_mentioned and args.multimodal_context_json_file is not None:
+                with open(args.multimodal_context_json_file, "r") as file_id:
+                    mentioned_objects = json.load(file_id)
+
+                report = evaluate_from_flat_list_mentioned_object(list_target, list_predicted, mentioned_objects)
+            else:
+
+                report = evaluate_from_flat_list(list_target, list_predicted)
             #print(report)
 
             # Evaluate Subtask 4
@@ -905,8 +1013,14 @@ def main():
                                 "response" : response
                             }]
                         })
-                if args.output_json_response_path:
-                    json.dump(predicted_response, open(args.output_json_response_path, "w"), indent=4)
+                if args.output_json_response_path is not None:
+
+                    if prefix:
+                        json_file_name = prefix+".json"
+                    else: # prefix == ""
+                        json_file_name = "final_checkpoint"+".json"
+
+                    json.dump(predicted_response, open(os.path.join(args.output_json_response_path, json_file_name), "w"), indent=4)
 
 
                 bleu_score, bleu_std_err = evaluate_response_generation(
@@ -951,15 +1065,35 @@ def main():
         
         report_list = []
         for prefix, report in report_of_all_models.items():
-            temp_list = [prefix, report["disamb_candidate_prec"], report["disamb_candidate_rec"], report["disamb_candidate_f1"], report["object_prec"],
-                            report["object_rec"], report["object_f1"], report["slot_f1"], report["act_f1"], report["bleu"]]
+            if args.cal_diff_f1_based_on_previously_mentioned and args.multimodal_context_json_file is not None:
+                temp_list = [prefix, report["disamb_candidate_prec"], report["disamb_candidate_rec"], report["disamb_candidate_f1"], 
+                    report["disamb_candidate_prec_mentioned_object"], report["disamb_candidate_rec_mentioned_object"], report["disamb_candidate_f1_mentioned_object"],
+                    report["disamb_candidate_prec_not_mentioned_object"], report["disamb_candidate_rec_not_mentioned_object"], report["disamb_candidate_f1_not_mentioned_object"],
+                    report["object_prec"], report["object_rec"], report["object_f1"], 
+                    report["object_prec_mentioned_object"], report["object_rec_mentioned_object"], report["object_f1_mentioned_object"], 
+                    report["object_prec_not_mentioned_object"], report["object_rec_not_mentioned_object"], report["object_f1_not_mentioned_object"], 
+                    report["slot_f1"], report["act_f1"], report["bleu"]]
+
+            else:
+                temp_list = [prefix, report["disamb_candidate_prec"], report["disamb_candidate_rec"], report["disamb_candidate_f1"], report["object_prec"],
+                                report["object_rec"], report["object_f1"], report["slot_f1"], report["act_f1"], report["bleu"]]
 
             report_list.append(temp_list)
         
         # 将结果转为.csv文件并且保存：
         # "Model_Checkpoint" "Subtask-1-Amb.-Candi.-F1" "Subtask-2-MM-Coref-F1" "Subtask-3-MM-DST-Slot-F1" "Subtask-3-MM-DST-Intent-F1" "Subtask-4-Response-Gen.-BLEU-4"
-        df = pd.DataFrame(report_list, columns=['model_name', "disamb_candidate_prec", "disamb_candidate_rec", "disamb_candidate_f1", "object_prec",
-                                            "object_rec", "object_f1", "slot_f1", "act_f1", "bleu"])
+        if args.cal_diff_f1_based_on_previously_mentioned and args.multimodal_context_json_file is not None:
+            df = pd.DataFrame(report_list, columns=['model_name', "disamb_candidate_prec", "disamb_candidate_rec", "disamb_candidate_f1", 
+                    "disamb_candidate_prec_mentioned_object", "disamb_candidate_rec_mentioned_object", "disamb_candidate_f1_mentioned_object", 
+                    "disamb_candidate_prec_not_mentioned_object", "disamb_candidate_rec_not_mentioned_object", "disamb_candidate_f1_not_mentioned_object", 
+                    "object_prec", "object_rec", "object_f1", 
+                    "object_prec_mentioned_object", "object_rec_mentioned_object", "object_f1_mentioned_object",
+                    "object_prec_not_mentioned_object", "object_rec_not_mentioned_object", "object_f1_not_mentioned_object",
+                    "slot_f1", "act_f1", "bleu"])
+
+        else:
+            df = pd.DataFrame(report_list, columns=['model_name', "disamb_candidate_prec", "disamb_candidate_rec", "disamb_candidate_f1", "object_prec",
+                                                "object_rec", "object_f1", "slot_f1", "act_f1", "bleu"])
         df.to_csv(args.output_path_csv_report)
     
 
