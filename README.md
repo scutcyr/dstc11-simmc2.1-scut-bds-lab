@@ -227,6 +227,36 @@ CONTEXT_LENGTH=6 # 2,4,6,8
 ## Evaluation
 We provide the code [eval_model.py](./eval_model.py) for evaluating the model.
 
+You can download our model from [huggingface](https://huggingface.co) by using follow scrips:
+```bash
+cd ~
+mkdir pretrained_model
+cd pretrained_model
+git lfs install
+git clone https://huggingface.co/scutcyr/dstc11-simmc2.1-iflytek
+```
+
+Then change the ```--model_dir``` to specify model, such as:
+```sh
+--model_dir=~/pretrained_model/dstc11-simmc2.1-iflytek/mt-bart/checkpoint-12
+```
+in the bash script file [run_test_model_simmc21_bart_20221020_2000_use_focalloss_exp3.sh](./scripts/run_test_model_simmc21_bart_20221020_2000_use_focalloss_exp3.sh)
+
+or 
+
+```sh
+--model_dir=~/pretrained_model/dstc11-simmc2.1-iflytek/mt-bart-sys/checkpoint-11
+```
+in the bash script file [run_infer_model_simmc21_bart_20221020_1800.sh](./scripts/run_infer_model_simmc21_bart_20221020_1800.sh)
+
+or
+
+
+```sh
+--model_dir=~/pretrained_model/dstc11-simmc2.1-iflytek/mt-bart-sys-nvattr/checkpoint-15
+```
+in the bash script file [run_test_model_simmc21_bart_sys_state_attr_ctxlen6_20221025_0100_use_focalloss.sh](./scripts/run_test_model_simmc21_bart_sys_state_attr_ctxlen6_20221025_0100_use_focalloss.sh)
+
 
 
 
@@ -242,7 +272,7 @@ We provide the code [eval_model.py](./eval_model.py) for evaluating the model.
 | mt-bart-sys-attr |  |  |  |  | 0.38995 |
 
 ### teststd result
-The teststd result is provided in the [./results/teststd-result](./results/teststd-result).
+The teststd result is provided in the [./results/teststd-result](./results/teststd-result). One subfolder corresponds to one model.
 
 
 
