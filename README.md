@@ -12,7 +12,7 @@
 
 ## Recent Update
 - 👏🏻  2022.10.10: The repository `dstc11-simmc2.1-iflytek` for [DSTC11 Track1](https://github.com/facebookresearch/simmc2) is created.
-
+- 👏🏻  2022.10.28: The model is public on huggingface, see the link [https://huggingface.co/scutcyr/dstc11-simmc2.1-iflytek](https://huggingface.co/scutcyr/dstc11-simmc2.1-iflytek) for detail.
 
 
 ## Overview
@@ -227,7 +227,7 @@ CONTEXT_LENGTH=6 # 2,4,6,8
 ## Evaluation
 We provide the code [eval_model.py](./eval_model.py) for evaluating the model.
 
-You can download our model from [huggingface](https://huggingface.co) by using follow scrips:
+You can download our model from [https://huggingface.co/scutcyr/dstc11-simmc2.1-iflytek](https://huggingface.co/scutcyr/dstc11-simmc2.1-iflytek) by using follow scrips:
 ```bash
 cd ~
 mkdir pretrained_model
