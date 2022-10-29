@@ -297,12 +297,36 @@ The teststd result is provided in the [./results/teststd-result](./results/tests
     doi = "10.18653/v1/2021.emnlp-main.401",
     pages = "4903--4912",
 }
+
+@inproceedings{lee-etal-2022-learning,
+    title = "Learning to Embed Multi-Modal Contexts for Situated Conversational Agents",
+    author = "Lee, Haeju  and
+      Kwon, Oh Joon  and
+      Choi, Yunseon  and
+      Park, Minho  and
+      Han, Ran  and
+      Kim, Yoonhyung  and
+      Kim, Jinhyeon  and
+      Lee, Youngjune  and
+      Shin, Haebin  and
+      Lee, Kangwook  and
+      Kim, Kee-Eung",
+    booktitle = "Findings of the Association for Computational Linguistics: NAACL 2022",
+    month = jul,
+    year = "2022",
+    address = "Seattle, United States",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2022.findings-naacl.61",
+    doi = "10.18653/v1/2022.findings-naacl.61",
+    pages = "813--830",
+}
 ```
-**NOTE**: The [paper][simmc2_arxiv] (EMNLP 2021) above describes in detail the datasets, the collection process, and some of the baselines we provide in this challenge. 
+
 
 ## Acknowledge
 * We would like to express our gratitude to the authors of [Hugging Face's Transformers🤗](https://huggingface.co/) and its open source community for the excellent design on pretrained models usage.
 * We would like to express our gratitude to [Meta Research | Facebook AI Research](https://github.com/facebookresearch) for the SIMMC2.1 dataset and the baseline code.
+* We would like to express our gratitude to [KAIST-AILab](https://github.com/KAIST-AILab/DSTC10-SIMMC) for the basic research framework on SIMMC2.0.
 
 ## License
 The project is provided under the [Apache-2.0 License](https://github.com/scutcyr/dstc11-simmc2.1-iflytek/blob/main/LICENSE).
