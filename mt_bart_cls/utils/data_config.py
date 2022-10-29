@@ -1,0 +1,1 @@
+DATA_DIR = "/ps2/sli/data/data_taowang49/projects/19_dstc11/simmc2.1_solutions/work/data"
