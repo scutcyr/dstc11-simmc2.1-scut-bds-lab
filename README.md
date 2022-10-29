@@ -17,6 +17,7 @@
 
 ## Overview
 The [SIMMC2.1](https://github.com/facebookresearch/simmc2) challenge aims to lay the foundations for the real-world assistant agents that can handle multimodal inputs, and perform multimodal actions. It has 4 tasks: Ambiguous Candidate Identification, Multimodal Coreference Resolution, Multimodal Dialog State Tracking, Response Generation. We consider the joint input of textual context, tokenized objects and scene as multi-modal input, as well as compare the performance of single task training and multi task joint training.
+As to subtask4, we also consider the system belief state (act and slot values) as the prombt for response generation. Non-visual metadata is also considered by adding the embedding to the object.
 
 
 ### About Folder and File
