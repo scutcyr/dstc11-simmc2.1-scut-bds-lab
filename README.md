@@ -269,7 +269,11 @@ in the bash script file [run_test_model_simmc21_bart_sys_state_attr_ctxlen6_2022
 | Model | Subtask-1 Amb. Candi. F1 | Subtask-2 MM Coref F1 | Subtask-3 MM DST Slot F1 | Subtask-3 MM DST Intent F1 | Subtask-4 Response Gen. BLEU-4 |
 |:----:|:----:|:----:|:----:|:----:|:----:|
 | mt-bart-ensemble | 0.68466 | 0.77860 | 0.91816 | 0.97828 | 0.34496 |
+| mt-bart-dstcla | 0.67589 | 0.78407 | 0.92013 | 0.97468 |  |
+| mt-bart-dstcla-ensemble | 0.67777 | 0.78640 | 0.92055 | 0.97456 |  |
 | mt-bart-sys |  |  |  |  | 0.39064 |
+| mt-bart-sys-2 |  |  |  |  | 0.3909 |
+| mt-bart-ensemble |  |  |  |  | 0.3894 |
 | mt-bart-sys-nvattr |  |  |  |  | 0.38995 |
 
 ### teststd result
