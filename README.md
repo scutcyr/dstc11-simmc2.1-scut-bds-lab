@@ -270,7 +270,7 @@ in the bash script file [run_test_model_simmc21_bart_sys_state_attr_ctxlen6_2022
 |:----:|:----:|:----:|:----:|:----:|:----:|
 | mt-bart-ensemble | 0.68466 | 0.77860 | 0.91816 | 0.97828 | 0.34496 |
 | mt-bart-sys |  |  |  |  | 0.39064 |
-| mt-bart-sys-attr |  |  |  |  | 0.38995 |
+| mt-bart-sys-nvattr |  |  |  |  | 0.38995 |
 
 ### teststd result
 The teststd result is provided in the [./results/teststd-result](./results/teststd-result). One subfolder corresponds to one model.
