@@ -10,7 +10,7 @@
     <a href="https://github.com/scutcyr/dstc11-simmc2.1-scut-bds-lab/stargazers"><img src="https://img.shields.io/github/stars/scutcyr/dstc11-simmc2.1-scut-bds-lab?color=ccf"></a>
 </p>
 
-**Team**: scut-bds-lab
+**Team**: [scut-bds-lab](https://github.com/scut-bds)
 
 ## Recent Update
 - 👏🏻  2022.10.10: The repository `dstc11-simmc2.1-scut-bds-lab` for [DSTC11 Track1](https://github.com/facebookresearch/simmc2) is created.
