@@ -1,0 +1,1 @@
+DATA_DIR = "~/projects/19_dstc11/simmc2.1_solutions/work/data"
