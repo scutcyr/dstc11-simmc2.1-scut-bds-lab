@@ -288,6 +288,27 @@ The teststd result is provided in the [./results/teststd-result](./results/tests
 ## References
 
 ```
+@inproceedings{chen-etal-2023-exploring-prompt,
+    title = "Exploring Prompt-based Multi-task Learning for Multimodal Dialog State Tracking and Immersive Multimodal Conversation",
+    author = "Chen, Yirong  and
+      Li, Ya  and
+      Wang, Tao  and
+      Xing, Xiaofen  and
+      Xu, Xiangmin  and
+      Liu, Quan  and
+      Liu, Cong  and
+      Hu, Guoping",
+    booktitle = "Proceedings of The Eleventh Dialog System Technology Challenge",
+    month = sep,
+    year = "2023",
+    address = "Prague, Czech Republic",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2023.dstc-1.1",
+    pages = "1--8",
+    abstract = "With the rise of the metaverse, immersive multimodal conversation has attracted more and more researchers{'} attention. Multimodal contexts will become more important for human-computer interaction in the metaverse, especially in shopping domain. Unlike traditional conversation tasks, immersive multimodal conversation has challenges such as multimodal ambiguous candidate identification and multimodal coreference resolution, which makes it more difficult to dialog state tracking and response generation, as described in SIMMC 2.1 challenge, a part of DSTC11. In particular, as the number of objects in the scene increases, the difficulty will increase dramatically. We proposed a prompt-based multi-task learning Encoder-Decoder, in which different subtasks use different prompts to make the model tend to focus on the current subtask. We achieve the winner in ambiguous candidates indentification and runner-up in multimodal coreference resolution (MM-Coref), multimodal dialog state tracking (MM-DST) and assistant response generation. Our code and model are made publicly available at https://github.com/scutcyr/dstc11-simmc2.1-scut-bds-lab.",
+}
+
+
 @inproceedings{kottur-etal-2021-simmc,
     title = "{SIMMC} 2.0: A Task-oriented Dialog Dataset for Immersive Multimodal Conversations",
     author = "Kottur, Satwik  and
